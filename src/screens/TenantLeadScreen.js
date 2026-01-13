@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,29 +12,26 @@ import {
     Image,
     Alert,
     ActivityIndicator,
+    FlatList,
+    Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import debounce from 'lodash.debounce';
 import { supabase } from '../lib/supabase';
+import {
+    searchLocations,
+    parseRequirementsWithAI,
+    sendOTP,
+    verifyOTP,
+    PROPERTY_TYPES,
+    BUDGET_PRESETS,
+    CURRENCY_CONFIG,
+    formatCurrency,
+} from '../lib/api';
+import OTPInput from '../components/OTPInput';
 
 const TOTAL_STEPS = 4;
-
-const PROPERTY_TYPES = [
-    { id: '1bedroom', label: '1 Bedroom', description: 'Perfect for singles or couples', icon: 'home' },
-    { id: '2bedroom', label: '2 Bedroom', description: 'Ideal for small families', icon: 'grid' },
-    { id: '3bedroom', label: '3+ Bedroom', description: 'Spacious family living', icon: 'layout' },
-    { id: 'studio', label: 'Studio', description: 'Compact & efficient', icon: 'square' },
-    { id: 'selfcontain', label: 'Self Contain', description: 'All-in-one living space', icon: 'box' },
-    { id: 'duplex', label: 'Duplex', description: 'Two-story living', icon: 'layers' },
-];
-
-const BUDGET_OPTIONS = [
-    { id: 'under15k', label: 'Under 15K', min: 0, max: 15000 },
-    { id: '15k-30k', label: '15K - 30K', min: 15000, max: 30000 },
-    { id: '30k-50k', label: '30K - 50K', min: 30000, max: 50000 },
-    { id: '50k-80k', label: '50K - 80K', min: 50000, max: 80000 },
-    { id: '80k+', label: '80K+', min: 80000, max: null },
-];
 
 const TenantLeadScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -44,12 +41,31 @@ const TenantLeadScreen = ({ navigation }) => {
 
     // Form data
     const [location, setLocation] = useState('');
+    const [locationData, setLocationData] = useState(null);
     const [propertyType, setPropertyType] = useState('');
     const [budget, setBudget] = useState('');
     const [selectedBudgetOption, setSelectedBudgetOption] = useState('');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
+    const [countryCode, setCountryCode] = useState('KE');
+
+    // Location autocomplete
+    const [locationSuggestions, setLocationSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [searchingLocation, setSearchingLocation] = useState(false);
+
+    // AI Quick Fill
+    const [showAIPanel, setShowAIPanel] = useState(false);
+    const [aiInput, setAiInput] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+
+    // OTP Verification
+    const [showOTPModal, setShowOTPModal] = useState(false);
+    const [otpStep, setOtpStep] = useState('idle'); // idle, sending, sent, verifying, verified
+    const [otpError, setOtpError] = useState('');
+    const [otpTimer, setOtpTimer] = useState(0);
+    const [resendTimer, setResendTimer] = useState(0);
 
     // Animations
     const progressAnim = useRef(new Animated.Value(0.25)).current;
@@ -63,6 +79,120 @@ const TenantLeadScreen = ({ navigation }) => {
             useNativeDriver: false,
         }).start();
     }, [currentStep]);
+
+    // OTP Timer effect
+    useEffect(() => {
+        let interval;
+        if (otpTimer > 0) {
+            interval = setInterval(() => setOtpTimer(t => t - 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [otpTimer]);
+
+    // Resend Timer effect
+    useEffect(() => {
+        let interval;
+        if (resendTimer > 0) {
+            interval = setInterval(() => setResendTimer(t => t - 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [resendTimer]);
+
+    // Debounced location search
+    const debouncedSearch = useCallback(
+        debounce(async (query) => {
+            if (query.length < 2) {
+                setLocationSuggestions([]);
+                setShowSuggestions(false);
+                return;
+            }
+            setSearchingLocation(true);
+            const results = await searchLocations(query);
+            setLocationSuggestions(results);
+            setShowSuggestions(results.length > 0);
+            setSearchingLocation(false);
+        }, 300),
+        []
+    );
+
+    const handleLocationChange = (text) => {
+        setLocation(text);
+        setLocationData(null);
+        debouncedSearch(text);
+    };
+
+    const handleLocationSelect = (item) => {
+        const displayName = item.area ? `${item.area}, ${item.city}` : item.name;
+        setLocation(displayName);
+        setLocationData(item);
+        setCountryCode(item.countryCode || 'KE');
+        setShowSuggestions(false);
+    };
+
+    // AI Quick Fill handler
+    const handleAIQuickFill = async () => {
+        if (aiInput.length < 10) {
+            Alert.alert('Too Short', 'Please describe your requirements in more detail');
+            return;
+        }
+        setAiLoading(true);
+        try {
+            const result = await parseRequirementsWithAI(aiInput);
+            if (result.success && result.data) {
+                if (result.data.location) setLocation(result.data.location);
+                if (result.data.propertyType) {
+                    const matched = PROPERTY_TYPES.find(p =>
+                        p.label.toLowerCase().includes(result.data.propertyType.toLowerCase())
+                    );
+                    if (matched) setPropertyType(matched.id);
+                }
+                if (result.data.budget) setBudget(result.data.budget.toString());
+                setShowAIPanel(false);
+                Alert.alert('Success', 'Form filled with your requirements!');
+            } else {
+                Alert.alert('Error', 'Could not parse your requirements. Try being more specific.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to process. Please try again.');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    // OTP handlers
+    const handleSendOTP = async () => {
+        if (!phone || phone.length < 9) {
+            Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+            return;
+        }
+        const fullPhone = `+${countryCode === 'KE' ? '254' : '91'}${phone.replace(/\D/g, '')}`;
+        setOtpStep('sending');
+        const result = await sendOTP(fullPhone);
+        if (result.success) {
+            setOtpStep('sent');
+            setOtpTimer(300); // 5 minutes
+            setResendTimer(30);
+            setShowOTPModal(true);
+        } else {
+            setOtpStep('idle');
+            Alert.alert('Error', result.error || 'Failed to send OTP');
+        }
+    };
+
+    const handleVerifyOTP = async (otp) => {
+        const fullPhone = `+${countryCode === 'KE' ? '254' : '91'}${phone.replace(/\D/g, '')}`;
+        setOtpStep('verifying');
+        setOtpError('');
+        const result = await verifyOTP(fullPhone, otp);
+        if (result.success && result.verified) {
+            setOtpStep('verified');
+            setShowOTPModal(false);
+            Alert.alert('Verified!', 'Your phone number has been verified');
+        } else {
+            setOtpError(result.error || 'Invalid code. Please try again.');
+            setOtpStep('sent');
+        }
+    };
 
     const animateTransition = (direction, callback) => {
         const startValue = direction === 'next' ? 50 : -50;
@@ -260,22 +390,49 @@ const TenantLeadScreen = ({ navigation }) => {
                             Search for a city, neighborhood, or area where you're looking to rent.
                         </Text>
 
-                        {/* Location Input */}
-                        <View style={styles.locationInputContainer}>
-                            <Feather name="navigation" size={20} color="#9CA3AF" style={styles.locationIcon} />
-                            <TextInput
-                                style={styles.locationInput}
-                                placeholder="e.g., Westlands, Nairobi or Koramangala, B"
-                                placeholderTextColor="#9CA3AF"
-                                value={location}
-                                onChangeText={setLocation}
-                            />
+                        {/* Location Input with Autocomplete */}
+                        <View style={styles.locationWrapper}>
+                            <View style={[styles.locationInputContainer, showSuggestions && styles.locationInputActive]}>
+                                <Feather name="navigation" size={20} color="#FE9200" style={styles.locationIcon} />
+                                <TextInput
+                                    style={styles.locationInput}
+                                    placeholder="e.g., Westlands, Nairobi"
+                                    placeholderTextColor="#9CA3AF"
+                                    value={location}
+                                    onChangeText={handleLocationChange}
+                                />
+                                {searchingLocation && <ActivityIndicator size="small" color="#FE9200" />}
+                                {locationData && <Feather name="check-circle" size={20} color="#10B981" />}
+                            </View>
+
+                            {/* Location Suggestions Dropdown */}
+                            {showSuggestions && (
+                                <View style={styles.suggestionsContainer}>
+                                    {locationSuggestions.map((item, index) => (
+                                        <TouchableOpacity
+                                            key={item.id || index}
+                                            style={styles.suggestionItem}
+                                            onPress={() => handleLocationSelect(item)}
+                                        >
+                                            <Feather name="map-pin" size={16} color="#6B7280" />
+                                            <View style={styles.suggestionText}>
+                                                <Text style={styles.suggestionName}>{item.area || item.name}</Text>
+                                                <Text style={styles.suggestionCity}>{item.city}, {item.country}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
 
-                        {/* AI Quick Fill */}
-                        <TouchableOpacity style={styles.aiQuickFill} activeOpacity={0.8}>
+                        {/* AI Quick Fill Toggle */}
+                        <TouchableOpacity
+                            style={styles.aiQuickFill}
+                            onPress={() => setShowAIPanel(!showAIPanel)}
+                            activeOpacity={0.8}
+                        >
                             <View style={styles.aiIconContainer}>
-                                <Feather name="zap" size={18} color="#9CA3AF" />
+                                <Feather name="zap" size={18} color="#FE9200" />
                             </View>
                             <View style={styles.aiTextContainer}>
                                 <Text style={styles.aiTitle}>AI Quick Fill</Text>
@@ -284,8 +441,38 @@ const TenantLeadScreen = ({ navigation }) => {
                             <View style={styles.aiBadge}>
                                 <Text style={styles.aiBadgeText}>AI{'\n'}POWERED</Text>
                             </View>
-                            <Feather name="chevron-down" size={20} color="#9CA3AF" />
+                            <Feather name={showAIPanel ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
                         </TouchableOpacity>
+
+                        {/* AI Panel (Collapsible) */}
+                        {showAIPanel && (
+                            <View style={styles.aiPanel}>
+                                <TextInput
+                                    style={styles.aiTextarea}
+                                    placeholder="E.g., I need a 2 bedroom apartment in Westlands with a budget of 50K, must have parking..."
+                                    placeholderTextColor="#9CA3AF"
+                                    value={aiInput}
+                                    onChangeText={setAiInput}
+                                    multiline
+                                    numberOfLines={4}
+                                    textAlignVertical="top"
+                                />
+                                <TouchableOpacity
+                                    style={[styles.aiButton, aiLoading && styles.buttonDisabled]}
+                                    onPress={handleAIQuickFill}
+                                    disabled={aiLoading}
+                                >
+                                    {aiLoading ? (
+                                        <ActivityIndicator color="#FFFFFF" />
+                                    ) : (
+                                        <>
+                                            <Feather name="zap" size={18} color="#FFFFFF" />
+                                            <Text style={styles.aiButtonText}>Auto-Fill Form</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </Animated.View>
                 );
 
@@ -652,6 +839,10 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     // Step 1 - Location
+    locationWrapper: {
+        marginBottom: 16,
+        zIndex: 10,
+    },
     locationInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -660,7 +851,11 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         paddingHorizontal: 16,
         height: 56,
-        marginBottom: 24,
+        backgroundColor: '#FFFFFF',
+    },
+    locationInputActive: {
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
     },
     locationIcon: {
         marginRight: 12,
@@ -669,6 +864,36 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         color: '#1F2937',
+    },
+    suggestionsContainer: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 2,
+        borderTopWidth: 0,
+        borderColor: '#FE9200',
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+        maxHeight: 200,
+    },
+    suggestionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    suggestionText: {
+        marginLeft: 12,
+        flex: 1,
+    },
+    suggestionName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1F2937',
+    },
+    suggestionCity: {
+        fontSize: 13,
+        color: '#6B7280',
     },
     aiQuickFill: {
         flexDirection: 'row',
@@ -683,12 +908,12 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 10,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#FFF5E6',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: '#FE9200',
     },
     aiTextContainer: {
         flex: 1,
@@ -716,6 +941,39 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textAlign: 'center',
         lineHeight: 12,
+    },
+    aiPanel: {
+        marginTop: 16,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    aiTextarea: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        padding: 12,
+        fontSize: 14,
+        color: '#1F2937',
+        minHeight: 100,
+        marginBottom: 12,
+    },
+    aiButton: {
+        flexDirection: 'row',
+        backgroundColor: '#FE9200',
+        borderRadius: 12,
+        height: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    aiButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 8,
     },
     // Step 2 - Property Type
     propertyGrid: {
