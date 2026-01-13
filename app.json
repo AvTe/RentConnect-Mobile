@@ -1,7 +1,7 @@
-{
+﻿{
   "expo": {
-    "name": "RentConnect-Mobile",
-    "slug": "RentConnect-Mobile",
+    "name": "RentConnect",
+    "slug": "rentconnect-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,20 +10,22 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FE9200"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yoombaa.rentconnect"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FE9200"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.yoombaa.rentconnect"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "scheme": "rentconnect"
   }
 }
