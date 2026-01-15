@@ -18,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import YoombaaLogo from '../../../assets/yoombaa logo svg.svg';
 
 const { width } = Dimensions.get('window');
 
@@ -192,11 +193,7 @@ const TenantDashboardScreen = ({ navigation }) => {
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {/* Clean Header - Logo Only */}
             <View style={styles.header}>
-                <Image
-                    source={require('../../../assets/yoombaa logo.png')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                />
+                <YoombaaLogo width={120} height={40} />
                 <View style={styles.headerRight}>
                     <TouchableOpacity style={styles.iconButton}>
                         <Feather name="bell" size={22} color={COLORS.text} />
