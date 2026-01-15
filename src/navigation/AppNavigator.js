@@ -30,32 +30,36 @@ const Tab = createBottomTabNavigator();
 
 const COLORS = {
   primary: '#FE9200',
-  inactive: '#9CA3AF',
+  primaryLight: '#FFF5E6',
+  inactive: '#6B7280',
   background: '#FFFFFF',
   border: '#F3F4F6',
   text: '#1F2937',
 };
 
-// Custom Tab Bar Icon with animation
+// Custom Tab Bar Icon - Pill Style (like the reference design)
 const TabIcon = ({ focused, icon, label, badge }) => {
+  if (focused) {
+    // Active state - Pill with icon + label
+    return (
+      <View style={styles.activePill}>
+        <Feather name={icon} size={18} color={COLORS.primary} />
+        <Text style={styles.activeLabel}>{label}</Text>
+      </View>
+    );
+  }
+
+  // Inactive state - Just icon
   return (
-    <View style={styles.tabIconContainer}>
-      {focused && <View style={styles.activeIndicator} />}
-      <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
-        <Feather
-          name={icon}
-          size={22}
-          color={focused ? COLORS.primary : COLORS.inactive}
-        />
+    <View style={styles.inactiveTab}>
+      <View style={styles.iconWrapper}>
+        <Feather name={icon} size={22} color={COLORS.inactive} />
         {badge > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
           </View>
         )}
       </View>
-      <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>
-        {label}
-      </Text>
     </View>
   );
 };
@@ -79,7 +83,7 @@ const AuthStack = () => {
   );
 };
 
-// Tenant Bottom Tab Navigator - Modern Design
+// Tenant Bottom Tab Navigator - Pill Style Design
 const TenantTabNavigator = () => {
   return (
     <Tab.Navigator
@@ -94,7 +98,7 @@ const TenantTabNavigator = () => {
         component={TenantDashboardScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="grid" label="Home" />
+            <TabIcon focused={focused} icon="home" label="Home" />
           ),
         }}
       />
@@ -103,7 +107,7 @@ const TenantTabNavigator = () => {
         component={MyRequestsScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="file-text" label="My Reque..." />
+            <TabIcon focused={focused} icon="file-text" label="Requests" />
           ),
         }}
       />
@@ -186,58 +190,53 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    height: Platform.OS === 'ios' ? 88 : 70,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    height: Platform.OS === 'ios' ? 88 : 68,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+    paddingHorizontal: 8,
   },
-  tabIconContainer: {
+  // Active Pill Style
+  activePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 25,
+    gap: 6,
+  },
+  activeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  // Inactive Tab
+  inactiveTab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 4,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    top: -8,
-    width: 24,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   iconWrapper: {
     position: 'relative',
-    marginBottom: 4,
   },
-  iconWrapperActive: {
-    transform: [{ scale: 1.1 }],
-  },
+  // Badge
   badge: {
     position: 'absolute',
     top: -6,
     right: -10,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: COLORS.background,
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
-  },
-  tabLabel: {
-    fontSize: 10,
-    color: COLORS.inactive,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  tabLabelActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
   },
 });
 
