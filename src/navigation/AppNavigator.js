@@ -3,9 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text, TouchableOpacity, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Auth Screens
 import LandingScreen from '../screens/LandingScreen';
@@ -35,82 +36,110 @@ const COLORS = {
   inactive: '#9CA3AF',
   background: '#FFFFFF',
   border: '#E5E7EB',
+  dark: '#1F2937',
 };
 
-// Custom Tab Bar Component
+// Custom Tab Bar Component with Center + Button
 const CustomTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
 
+  // Get tabs - filtering out the dummy "Add" screen
+  const leftTabs = state.routes.slice(0, 2); // Home, Requests
+  const rightTabs = state.routes.slice(3); // Support, Settings
+
+  const renderTab = (route, index, actualIndex) => {
+    const isFocused = state.index === actualIndex;
+
+    let iconName;
+    let label;
+
+    switch (route.name) {
+      case 'Dashboard':
+        iconName = 'home';
+        label = 'Home';
+        break;
+      case 'Requests':
+        iconName = 'file-text';
+        label = 'Requests';
+        break;
+      case 'Support':
+        iconName = 'headphones';
+        label = 'Support';
+        break;
+      case 'Settings':
+        iconName = 'settings';
+        label = 'Settings';
+        break;
+      default:
+        iconName = 'circle';
+        label = '';
+    }
+
+    const onPress = () => {
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name);
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        key={route.key}
+        style={styles.tabItem}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        {isFocused ? (
+          <View style={styles.activePill}>
+            <Feather name={iconName} size={18} color={COLORS.primary} />
+            <Text style={styles.activeLabel}>{label}</Text>
+          </View>
+        ) : (
+          <View style={styles.inactiveTab}>
+            <Feather name={iconName} size={22} color={COLORS.inactive} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const handleAddPress = () => {
+    navigation.navigate('TenantLead');
+  };
+
   return (
-    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}>
-      <View style={styles.tabBarContent}>
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
+    <View style={[styles.tabBarWrapper, { paddingBottom: insets.bottom }]}>
+      <View style={styles.tabBarContainer}>
+        {/* Left Tabs */}
+        <View style={styles.tabGroup}>
+          {leftTabs.map((route, index) => renderTab(route, index, index))}
+        </View>
 
-          let iconName;
-          let label;
-          let showBadge = false;
+        {/* Center Add Button */}
+        <TouchableOpacity
+          style={styles.addButtonWrapper}
+          onPress={handleAddPress}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={[COLORS.primary, '#E58300']}
+            style={styles.addButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Feather name="plus" size={28} color="#FFFFFF" />
+          </LinearGradient>
+        </TouchableOpacity>
 
-          switch (route.name) {
-            case 'Dashboard':
-              iconName = 'home';
-              label = 'Home';
-              break;
-            case 'Requests':
-              iconName = 'file-text';
-              label = 'Requests';
-              break;
-            case 'Messages':
-              iconName = 'message-square';
-              label = 'Messages';
-              showBadge = true;
-              break;
-            case 'Support':
-              iconName = 'headphones';
-              label = 'Support';
-              break;
-            case 'Settings':
-              iconName = 'settings';
-              label = 'Settings';
-              break;
-            default:
-              iconName = 'circle';
-              label = '';
-          }
-
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
-
-          return (
-            <View key={route.key} style={styles.tabItem}>
-              {isFocused ? (
-                <View style={styles.activePill} onTouchEnd={onPress}>
-                  <Feather name={iconName} size={18} color={COLORS.primary} />
-                  <Text style={styles.activeLabel}>{label}</Text>
-                </View>
-              ) : (
-                <View style={styles.inactiveTab} onTouchEnd={onPress}>
-                  <Feather name={iconName} size={22} color={COLORS.inactive} />
-                  {showBadge && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>2</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          );
-        })}
+        {/* Right Tabs */}
+        <View style={styles.tabGroup}>
+          {rightTabs.map((route, index) => renderTab(route, index, index + 3))}
+        </View>
       </View>
     </View>
   );
@@ -133,7 +162,10 @@ const AuthStack = () => {
   );
 };
 
-// Tenant Tab Navigator
+// Dummy component for the center tab (not actually rendered)
+const DummyScreen = () => null;
+
+// Tenant Tab Navigator - 4 tabs + center button
 const TenantTabNavigator = () => {
   return (
     <Tab.Navigator
@@ -142,7 +174,11 @@ const TenantTabNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={TenantDashboardScreen} />
       <Tab.Screen name="Requests" component={MyRequestsScreen} />
-      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen
+        name="Add"
+        component={DummyScreen}
+        options={{ tabBarButton: () => null }}
+      />
       <Tab.Screen name="Support" component={SupportScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
@@ -157,7 +193,7 @@ const MainStack = () => {
       <Stack.Screen
         name="TenantLead"
         component={TenantLeadScreen}
-        options={{ animation: 'slide_from_right' }}
+        options={{ animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="Profile"
@@ -193,23 +229,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  // Tab Bar Container
-  tabBarContainer: {
+  // Tab Bar Styles
+  tabBarWrapper: {
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
-  tabBarContent: {
+  tabBarContainer: {
     flexDirection: 'row',
-    height: 60,
+    height: 65,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  tabGroup: {
+    flexDirection: 'row',
+    flex: 1,
+    justifyContent: 'space-evenly',
   },
   tabItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 8,
   },
   // Active Pill
   activePill: {
@@ -217,10 +258,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 25,
-    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 5,
   },
   activeLabel: {
     fontSize: 12,
@@ -231,26 +272,21 @@ const styles = StyleSheet.create({
   inactiveTab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    position: 'relative',
+    paddingVertical: 8,
   },
-  // Badge
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: -10,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: COLORS.primary,
+  // Center Add Button
+  addButtonWrapper: {
+    marginTop: -30,
+    borderRadius: 30,
+    padding: 4,
+    backgroundColor: COLORS.background,
+  },
+  addButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
   },
 });
 

@@ -180,7 +180,7 @@ const TenantDashboardScreen = ({ navigation }) => {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
                 }
             >
-                {/* Hero Banner - Improved */}
+                {/* Promotional Banner */}
                 <View style={styles.bannerContainer}>
                     <ImageBackground
                         source={require('../../../assets/hero section img.jpg')}
@@ -188,23 +188,23 @@ const TenantDashboardScreen = ({ navigation }) => {
                         imageStyle={styles.bannerImage}
                     >
                         <LinearGradient
-                            colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.5)']}
+                            colors={['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(254,146,0,0.4)']}
                             style={styles.bannerGradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 0, y: 1 }}
                         >
-                            <Text style={styles.bannerGreeting}>Jambo, {getUserName()}!</Text>
-                            <Text style={styles.bannerText}>
-                                Ready to find your next home? Post a{'\n'}request to let agents come to you.
+                            <View style={styles.promoTag}>
+                                <Text style={styles.promoTagText}>🏠 FEATURED</Text>
+                            </View>
+                            <Text style={styles.bannerTitle}>Find Your Dream Home</Text>
+                            <Text style={styles.bannerSubtitle}>
+                                Explore premium listings in Nairobi,{'\n'}Mombasa, Kisumu & more
                             </Text>
-                            <TouchableOpacity
-                                style={styles.ctaButton}
-                                onPress={() => navigation.navigate('TenantLead')}
-                                activeOpacity={0.85}
-                            >
-                                <Feather name="plus-circle" size={16} color="#FFFFFF" />
-                                <Text style={styles.ctaButtonText}>Post New Request</Text>
-                            </TouchableOpacity>
+                            <View style={styles.bannerDots}>
+                                <View style={[styles.dot, styles.dotActive]} />
+                                <View style={styles.dot} />
+                                <View style={styles.dot} />
+                            </View>
                         </LinearGradient>
                     </ImageBackground>
                 </View>
@@ -426,8 +426,21 @@ const styles = StyleSheet.create({
         padding: 20,
         justifyContent: 'flex-end',
     },
-    bannerGreeting: {
-        fontSize: 26,
+    promoTag: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        alignSelf: 'flex-start',
+        marginBottom: 10,
+    },
+    promoTagText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    bannerTitle: {
+        fontSize: 24,
         fontWeight: '700',
         color: '#FFFFFF',
         marginBottom: 6,
@@ -435,26 +448,25 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
     },
-    bannerText: {
+    bannerSubtitle: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.9)',
         lineHeight: 19,
-        marginBottom: 14,
+        marginBottom: 12,
     },
-    ctaButton: {
+    bannerDots: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.primary,
-        paddingHorizontal: 18,
-        paddingVertical: 10,
-        borderRadius: 10,
-        alignSelf: 'flex-start',
         gap: 6,
     },
-    ctaButtonText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '600',
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: 'rgba(255,255,255,0.4)',
+    },
+    dotActive: {
+        backgroundColor: '#FFFFFF',
+        width: 20,
     },
     // Stats Cards Styles
     statsContainer: {
