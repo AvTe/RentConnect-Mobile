@@ -3,8 +3,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View, StyleSheet, Text, Platform } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Auth Screens
 import LandingScreen from '../screens/LandingScreen';
@@ -36,36 +37,20 @@ const COLORS = {
   border: '#E5E7EB',
 };
 
-// Auth Stack (Unauthenticated users)
-const AuthStack = () => {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Landing" component={LandingScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="SignUp" component={SignUpScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <Stack.Screen
-        name="TenantLead"
-        component={TenantLeadScreen}
-        options={{
-          animation: 'slide_from_right',
-        }}
-      />
-    </Stack.Navigator>
-  );
-};
+// Custom Tab Bar Component
+const CustomTabBar = ({ state, descriptors, navigation }) => {
+  const insets = useSafeAreaInsets();
 
-// Tenant Bottom Tab Navigator - Pill Style Design
-const TenantTabNavigator = () => {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarItemStyle: styles.tabBarItem,
-        tabBarIcon: ({ focused }) => {
+    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom }]}>
+      <View style={styles.tabBarContent}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+
           let iconName;
           let label;
+          let showBadge = false;
 
           switch (route.name) {
             case 'Dashboard':
@@ -79,6 +64,7 @@ const TenantTabNavigator = () => {
             case 'Messages':
               iconName = 'message-square';
               label = 'Messages';
+              showBadge = true;
               break;
             case 'Support':
               iconName = 'headphones';
@@ -93,32 +79,66 @@ const TenantTabNavigator = () => {
               label = '';
           }
 
-          const showBadge = route.name === 'Messages';
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
 
-          if (focused) {
-            // Active - Pill Style
-            return (
-              <View style={styles.activePill}>
-                <Feather name={iconName} size={18} color={COLORS.primary} />
-                <Text style={styles.activeLabel}>{label}</Text>
-              </View>
-            );
-          }
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
 
-          // Inactive - Just Icon
           return (
-            <View style={styles.inactiveIcon}>
-              <Feather name={iconName} size={22} color={COLORS.inactive} />
-              {showBadge && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>2</Text>
+            <View key={route.key} style={styles.tabItem}>
+              {isFocused ? (
+                <View style={styles.activePill} onTouchEnd={onPress}>
+                  <Feather name={iconName} size={18} color={COLORS.primary} />
+                  <Text style={styles.activeLabel}>{label}</Text>
+                </View>
+              ) : (
+                <View style={styles.inactiveTab} onTouchEnd={onPress}>
+                  <Feather name={iconName} size={22} color={COLORS.inactive} />
+                  {showBadge && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>2</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
           );
-        },
-        tabBarShowLabel: false,
-      })}
+        })}
+      </View>
+    </View>
+  );
+};
+
+// Auth Stack
+const AuthStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Landing" component={LandingScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen
+        name="TenantLead"
+        component={TenantLeadScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Tenant Tab Navigator
+const TenantTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Dashboard" component={TenantDashboardScreen} />
       <Tab.Screen name="Requests" component={MyRequestsScreen} />
@@ -129,7 +149,7 @@ const TenantTabNavigator = () => {
   );
 };
 
-// Main Stack (Authenticated users)
+// Main Stack
 const MainStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -173,18 +193,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  tabBar: {
+  // Tab Bar Container
+  tabBarContainer: {
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    height: Platform.OS === 'ios' ? 90 : 65,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
+  },
+  tabBarContent: {
+    flexDirection: 'row',
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'space-around',
     paddingHorizontal: 10,
   },
-  tabBarItem: {
-    paddingVertical: 0,
-    marginVertical: 0,
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Active Pill
   activePill: {
@@ -192,40 +217,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 5,
-    minWidth: 80,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 25,
+    gap: 6,
   },
   activeLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.primary,
   },
-  // Inactive Icon
-  inactiveIcon: {
+  // Inactive Tab
+  inactiveTab: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
     position: 'relative',
-    paddingVertical: 8,
   },
   // Badge
   badge: {
     position: 'absolute',
-    top: 2,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: 4,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
   },
 });
