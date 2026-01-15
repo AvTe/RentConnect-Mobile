@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     Animated,
     Dimensions,
+    FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -58,6 +59,36 @@ const TenantDashboardScreen = ({ navigation }) => {
     const scaleAnim2 = useRef(new Animated.Value(0.8)).current;
     const scaleAnim3 = useRef(new Animated.Value(0.8)).current;
 
+    // Carousel state
+    const [currentSlide, setCurrentSlide] = useState(0);
+    const carouselRef = useRef(null);
+    const BANNER_WIDTH = width - 40;
+
+    // Promo slides data
+    const promoSlides = [
+        {
+            id: 1,
+            tag: '🏠 FEATURED',
+            title: 'Find Your Dream Home',
+            subtitle: 'Explore premium listings in Nairobi,\nMombasa, Kisumu & more',
+            gradient: ['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(254,146,0,0.4)'],
+        },
+        {
+            id: 2,
+            tag: '🔥 HOT DEALS',
+            title: 'Special Offers This Month',
+            subtitle: 'Get up to 50% off on first month\nrent in selected properties',
+            gradient: ['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(139,92,246,0.4)'],
+        },
+        {
+            id: 3,
+            tag: '✨ NEW',
+            title: 'Premium Apartments',
+            subtitle: 'Luxury living spaces now available\nin Westlands & Kilimani',
+            gradient: ['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(16,185,129,0.4)'],
+        },
+    ];
+
     const fetchData = useCallback(async () => {
         try {
             const { data: leads, error } = await supabase
@@ -88,6 +119,19 @@ const TenantDashboardScreen = ({ navigation }) => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Auto-scroll carousel
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentSlide((prev) => {
+                const nextSlide = (prev + 1) % promoSlides.length;
+                carouselRef.current?.scrollToIndex({ index: nextSlide, animated: true });
+                return nextSlide;
+            });
+        }, 4000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         // Animate stats cards on load
@@ -180,33 +224,59 @@ const TenantDashboardScreen = ({ navigation }) => {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
                 }
             >
-                {/* Promotional Banner */}
-                <View style={styles.bannerContainer}>
-                    <ImageBackground
-                        source={require('../../../assets/hero section img.jpg')}
-                        style={styles.bannerBackground}
-                        imageStyle={styles.bannerImage}
-                    >
-                        <LinearGradient
-                            colors={['rgba(0,0,0,0.65)', 'rgba(0,0,0,0.3)', 'rgba(254,146,0,0.4)']}
-                            style={styles.bannerGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 0, y: 1 }}
-                        >
-                            <View style={styles.promoTag}>
-                                <Text style={styles.promoTagText}>🏠 FEATURED</Text>
+                {/* Promotional Carousel Banner */}
+                <View style={styles.carouselContainer}>
+                    <FlatList
+                        ref={carouselRef}
+                        data={promoSlides}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        keyExtractor={(item) => item.id.toString()}
+                        onMomentumScrollEnd={(e) => {
+                            const index = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
+                            setCurrentSlide(index);
+                        }}
+                        getItemLayout={(data, index) => ({
+                            length: BANNER_WIDTH,
+                            offset: BANNER_WIDTH * index,
+                            index,
+                        })}
+                        renderItem={({ item }) => (
+                            <View style={[styles.bannerSlide, { width: BANNER_WIDTH }]}>
+                                <ImageBackground
+                                    source={require('../../../assets/hero section img.jpg')}
+                                    style={styles.bannerBackground}
+                                    imageStyle={styles.bannerImage}
+                                >
+                                    <LinearGradient
+                                        colors={item.gradient}
+                                        style={styles.bannerGradient}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 0, y: 1 }}
+                                    >
+                                        <View style={styles.promoTag}>
+                                            <Text style={styles.promoTagText}>{item.tag}</Text>
+                                        </View>
+                                        <Text style={styles.bannerTitle}>{item.title}</Text>
+                                        <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
+                                    </LinearGradient>
+                                </ImageBackground>
                             </View>
-                            <Text style={styles.bannerTitle}>Find Your Dream Home</Text>
-                            <Text style={styles.bannerSubtitle}>
-                                Explore premium listings in Nairobi,{'\n'}Mombasa, Kisumu & more
-                            </Text>
-                            <View style={styles.bannerDots}>
-                                <View style={[styles.dot, styles.dotActive]} />
-                                <View style={styles.dot} />
-                                <View style={styles.dot} />
-                            </View>
-                        </LinearGradient>
-                    </ImageBackground>
+                        )}
+                    />
+                    {/* Dots Indicator */}
+                    <View style={styles.dotsContainer}>
+                        {promoSlides.map((_, index) => (
+                            <View
+                                key={index}
+                                style={[
+                                    styles.dot,
+                                    currentSlide === index && styles.dotActive,
+                                ]}
+                            />
+                        ))}
+                    </View>
                 </View>
 
                 {/* Stats Cards - Improved */}
@@ -406,67 +476,71 @@ const styles = StyleSheet.create({
     scrollContent: {
         padding: 20,
     },
-    // Banner Styles
-    bannerContainer: {
+    // Carousel & Banner Styles
+    carouselContainer: {
+        marginBottom: 20,
+    },
+    bannerSlide: {
         borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: 20,
         borderWidth: 1,
         borderColor: COLORS.border,
     },
     bannerBackground: {
         width: '100%',
-        height: 180,
+        height: 220,
     },
     bannerImage: {
         borderRadius: 20,
     },
     bannerGradient: {
         flex: 1,
-        padding: 20,
+        padding: 24,
         justifyContent: 'flex-end',
     },
     promoTag: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 20,
         alignSelf: 'flex-start',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     promoTagText: {
         color: '#FFFFFF',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '600',
     },
     bannerTitle: {
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: '700',
         color: '#FFFFFF',
-        marginBottom: 6,
+        marginBottom: 8,
         textShadowColor: 'rgba(0,0,0,0.3)',
         textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        textShadowRadius: 3,
     },
     bannerSubtitle: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.9)',
-        lineHeight: 19,
-        marginBottom: 12,
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.95)',
+        lineHeight: 21,
     },
-    bannerDots: {
+    dotsContainer: {
         flexDirection: 'row',
-        gap: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 14,
+        gap: 8,
     },
     dot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.4)',
+        backgroundColor: '#D1D5DB',
     },
     dotActive: {
-        backgroundColor: '#FFFFFF',
-        width: 20,
+        backgroundColor: COLORS.primary,
+        width: 24,
     },
     // Stats Cards Styles
     statsContainer: {
