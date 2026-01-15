@@ -260,6 +260,7 @@ export const AuthProvider = ({ children }) => {
     user,
     session,
     userData,
+    userProfile: userData, // Alias for compatibility
     loading,
     // Auth methods
     signIn,
@@ -269,6 +270,7 @@ export const AuthProvider = ({ children }) => {
     // Profile methods
     updateProfile,
     refreshUserData,
+    refreshProfile: refreshUserData, // Alias for compatibility
     // Role helpers
     hasRole,
     isAgent: () => hasRole('agent'),

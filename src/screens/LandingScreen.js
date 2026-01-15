@@ -11,10 +11,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
-
-
 
 const LandingScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -43,72 +42,116 @@ const LandingScreen = ({ navigation }) => {
                 style={styles.backgroundImage}
                 resizeMode="cover"
             >
-                {/* Dark Overlay for better text visibility */}
-                <View style={styles.overlay} />
+                {/* Gradient Overlay for better text visibility */}
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.2)', 'rgba(254,146,0,0.3)']}
+                    style={styles.gradientOverlay}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                />
 
                 {/* Content Container */}
                 <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
 
-                    {/* Logo Section */}
+                    {/* Logo Section with Tagline */}
                     <View style={styles.logoSection}>
-                        <Image
-                            source={require('../../assets/yoombaa logo.png')}
-                            style={styles.logo}
-                            resizeMode="contain"
-                        />
+                        <View style={styles.logoContainer}>
+                            <Image
+                                source={require('../../assets/yoombaa logo.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
+                        </View>
                         <Text style={styles.logoText}>yoombaa</Text>
+                        <Text style={styles.tagline}>Kenya's #1 Rental Marketplace</Text>
                     </View>
 
                     {/* Spacer */}
                     <View style={styles.spacer} />
 
                     {/* Bottom Card */}
-                    <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 20 }]}>
+                    <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 24 }]}>
                         {/* Title */}
-                        <Text style={styles.title}>How would you like to</Text>
-                        <Text style={styles.titleHighlight}>use Yoombaa?</Text>
+                        <Text style={styles.welcomeText}>Welcome! 👋</Text>
+                        <Text style={styles.title}>Find your perfect home</Text>
+                        <Text style={styles.subtitle}>or connect with tenants looking for one</Text>
 
-                        {/* Tenant Option - Goes to Login */}
-                        <TouchableOpacity
-                            style={styles.optionCard}
-                            onPress={handleTenantPress}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.optionIconContainer}>
-                                <Feather name="key" size={22} color="#FE9200" />
-                            </View>
-                            <View style={styles.optionTextContainer}>
-                                <Text style={styles.optionTitle}>I am a Tenant</Text>
-                                <Text style={styles.optionSubtitle}>Post your rental needs</Text>
-                            </View>
-                            <Feather name="arrow-right" size={20} color="#9CA3AF" />
-                        </TouchableOpacity>
+                        {/* Option Cards */}
+                        <View style={styles.cardsContainer}>
+                            {/* Tenant Option */}
+                            <TouchableOpacity
+                                style={styles.optionCard}
+                                onPress={handleTenantPress}
+                                activeOpacity={0.9}
+                            >
+                                <LinearGradient
+                                    colors={['#FE9200', '#FF7A00']}
+                                    style={styles.cardGradient}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                >
+                                    <View style={styles.cardContent}>
+                                        <View style={styles.iconCircle}>
+                                            <Feather name="home" size={24} color="#FE9200" />
+                                        </View>
+                                        <View style={styles.cardTextContainer}>
+                                            <Text style={styles.cardTitle}>I'm Looking to Rent</Text>
+                                            <Text style={styles.cardSubtitle}>Post your rental needs for free</Text>
+                                        </View>
+                                        <View style={styles.arrowCircle}>
+                                            <Feather name="arrow-right" size={18} color="#FFFFFF" />
+                                        </View>
+                                    </View>
+                                </LinearGradient>
+                            </TouchableOpacity>
 
-                        {/* Agent Option - Goes to Registration */}
-                        <TouchableOpacity
-                            style={styles.optionCard}
-                            onPress={handleAgentPress}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[styles.optionIconContainer, styles.agentIconContainer]}>
-                                <Feather name="briefcase" size={22} color="#0D9488" />
-                            </View>
-                            <View style={styles.optionTextContainer}>
-                                <Text style={styles.optionTitle}>I am an Agent</Text>
-                                <Text style={styles.optionSubtitle}>Register & access leads</Text>
-                            </View>
-                            <Feather name="arrow-right" size={20} color="#9CA3AF" />
-                        </TouchableOpacity>
+                            {/* Agent Option */}
+                            <TouchableOpacity
+                                style={styles.optionCard}
+                                onPress={handleAgentPress}
+                                activeOpacity={0.9}
+                            >
+                                <View style={styles.agentCard}>
+                                    <View style={styles.cardContent}>
+                                        <View style={[styles.iconCircle, styles.agentIconCircle]}>
+                                            <Feather name="briefcase" size={24} color="#1F2937" />
+                                        </View>
+                                        <View style={styles.cardTextContainer}>
+                                            <Text style={styles.agentCardTitle}>I'm a Real Estate Agent</Text>
+                                            <Text style={styles.agentCardSubtitle}>Register & access quality leads</Text>
+                                        </View>
+                                        <View style={[styles.arrowCircle, styles.agentArrowCircle]}>
+                                            <Feather name="arrow-right" size={18} color="#1F2937" />
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
 
-                        {/* Login Link */}
+                        {/* Divider */}
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>or</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
+                        {/* Login Button */}
                         <TouchableOpacity
-                            style={styles.loginContainer}
+                            style={styles.loginButton}
                             onPress={handleLoginPress}
+                            activeOpacity={0.8}
+                        >
+                            <Feather name="log-in" size={18} color="#FE9200" />
+                            <Text style={styles.loginButtonText}>Sign in to your account</Text>
+                        </TouchableOpacity>
+
+                        {/* Skip Link */}
+                        <TouchableOpacity
+                            style={styles.skipContainer}
+                            onPress={handleTenantPress}
                             activeOpacity={0.7}
                         >
-                            <Text style={styles.loginText}>Existing user? </Text>
-                            <Text style={styles.loginLink}>Log in</Text>
-                            <Feather name="arrow-right" size={16} color="#0D9488" style={{ marginLeft: 4 }} />
+                            <Text style={styles.skipText}>Just browsing? Skip for now</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -127,9 +170,8 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
-    overlay: {
+    gradientOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
     },
     content: {
         flex: 1,
@@ -137,99 +179,186 @@ const styles = StyleSheet.create({
     },
     logoSection: {
         alignItems: 'center',
-        paddingTop: 40,
+        paddingTop: 50,
+    },
+    logoContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        backdropFilter: 'blur(10px)',
     },
     logo: {
-        width: 60,
-        height: 60,
-        tintColor: '#FFFFFF',
+        width: 50,
+        height: 50,
     },
     logoText: {
-        fontSize: 36,
+        fontSize: 38,
         fontWeight: '300',
         color: '#FFFFFF',
-        marginTop: 10,
-        letterSpacing: 2,
+        letterSpacing: 3,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
+    },
+    tagline: {
+        fontSize: 15,
+        color: 'rgba(255, 255, 255, 0.9)',
+        marginTop: 8,
+        letterSpacing: 0.5,
+        fontWeight: '500',
     },
     spacer: {
         flex: 1,
     },
     bottomCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 32,
         borderTopRightRadius: 32,
         paddingHorizontal: 24,
-        paddingTop: 32,
+        paddingTop: 28,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 20,
+    },
+    welcomeText: {
+        fontSize: 14,
+        color: '#FE9200',
+        fontWeight: '600',
+        textAlign: 'center',
+        marginBottom: 4,
+        letterSpacing: 0.5,
     },
     title: {
-        fontSize: 26,
-        fontWeight: '600',
-        color: '#1F2937',
-        textAlign: 'center',
-        lineHeight: 32,
-    },
-    titleHighlight: {
         fontSize: 26,
         fontWeight: '700',
         color: '#1F2937',
         textAlign: 'center',
-        marginBottom: 28,
+        lineHeight: 32,
+    },
+    subtitle: {
+        fontSize: 15,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginBottom: 24,
+        marginTop: 4,
+    },
+    cardsContainer: {
+        gap: 12,
     },
     optionCard: {
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#FE9200',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    cardGradient: {
+        borderRadius: 16,
+    },
+    cardContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: '#F3F4F6',
+        padding: 18,
     },
-    optionIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: '#FFF5E6',
+    iconCircle: {
+        width: 52,
+        height: 52,
+        borderRadius: 14,
+        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 14,
     },
-    agentIconContainer: {
-        backgroundColor: '#E0F2FE',
+    agentIconCircle: {
+        backgroundColor: '#F3F4F6',
     },
-    optionTextContainer: {
+    cardTextContainer: {
         flex: 1,
     },
-    optionTitle: {
+    cardTitle: {
         fontSize: 17,
-        fontWeight: '600',
-        color: '#1F2937',
-        marginBottom: 2,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 3,
     },
-    optionSubtitle: {
-        fontSize: 14,
+    cardSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.85)',
+    },
+    arrowCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    agentCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+    },
+    agentCardTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 3,
+    },
+    agentCardSubtitle: {
+        fontSize: 13,
         color: '#6B7280',
     },
-    loginContainer: {
+    agentArrowCircle: {
+        backgroundColor: '#F3F4F6',
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E5E7EB',
+    },
+    dividerText: {
+        fontSize: 13,
+        color: '#9CA3AF',
+        paddingHorizontal: 16,
+    },
+    loginButton: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 20,
-        paddingVertical: 12,
+        backgroundColor: '#FFF5E6',
+        borderRadius: 14,
+        paddingVertical: 16,
+        borderWidth: 1,
+        borderColor: '#FED7AA',
     },
-    loginText: {
+    loginButtonText: {
         fontSize: 15,
-        color: '#6B7280',
-    },
-    loginLink: {
-        fontSize: 15,
-        color: '#0D9488',
         fontWeight: '600',
+        color: '#FE9200',
+        marginLeft: 8,
+    },
+    skipContainer: {
+        alignItems: 'center',
+        marginTop: 16,
+        paddingVertical: 8,
+    },
+    skipText: {
+        fontSize: 14,
+        color: '#9CA3AF',
     },
 });
 

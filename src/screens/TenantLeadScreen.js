@@ -194,6 +194,12 @@ const TenantLeadScreen = ({ navigation }) => {
         }
     };
 
+    // Budget preset selection handler
+    const handleBudgetSelect = (optionId) => {
+        setSelectedBudgetOption(optionId);
+        setBudget('');
+    };
+
     const animateTransition = (direction, callback) => {
         const startValue = direction === 'next' ? 50 : -50;
         slideAnim.setValue(startValue);
@@ -259,17 +265,36 @@ const TenantLeadScreen = ({ navigation }) => {
         setLoading(true);
 
         try {
-            // Prepare lead data
+            // Get budget value as number
+            const budgetValue = selectedBudgetOption
+                ? (BUDGET_PRESETS[countryCode] || BUDGET_PRESETS.KE).find(b => b.id === selectedBudgetOption)?.max || 0
+                : parseInt(budget) || 0;
+
+            // Get bedrooms from property type
+            let bedrooms = 1;
+            if (propertyType === '2 Bedroom') bedrooms = 2;
+            else if (propertyType === '3 Bedroom') bedrooms = 3;
+            else if (propertyType === 'Studio') bedrooms = 0;
+
+            // Prepare lead data matching the database schema
             const leadData = {
+                // Location (single field, not area/city)
                 location: location.trim(),
+
+                // Property type
                 property_type: propertyType,
-                budget_min: selectedBudgetOption ? BUDGET_OPTIONS.find(b => b.id === selectedBudgetOption)?.min : parseInt(budget) || 0,
-                budget_max: selectedBudgetOption ? BUDGET_OPTIONS.find(b => b.id === selectedBudgetOption)?.max : parseInt(budget) || 0,
+                bedrooms: bedrooms,
+
+                // Budget as number
+                budget: budgetValue,
+
+                // Contact details with correct column names
                 tenant_name: name.trim(),
                 tenant_email: email.trim(),
-                tenant_phone: phone.trim() || null,
+                tenant_phone: phone.trim() || '',  // Empty string instead of null
+
+                // Status
                 status: 'active',
-                created_at: new Date().toISOString(),
             };
 
             // Insert into Supabase
@@ -287,11 +312,6 @@ const TenantLeadScreen = ({ navigation }) => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleBudgetSelect = (optionId) => {
-        setSelectedBudgetOption(optionId);
-        setBudget('');
     };
 
     const getProgressPercentage = () => {
@@ -425,7 +445,7 @@ const TenantLeadScreen = ({ navigation }) => {
                             )}
                         </View>
 
-                        {/* AI Quick Fill Toggle */}
+                        {/* AI Quick Fill - Hidden for now
                         <TouchableOpacity
                             style={styles.aiQuickFill}
                             onPress={() => setShowAIPanel(!showAIPanel)}
@@ -444,7 +464,6 @@ const TenantLeadScreen = ({ navigation }) => {
                             <Feather name={showAIPanel ? 'chevron-up' : 'chevron-down'} size={20} color="#9CA3AF" />
                         </TouchableOpacity>
 
-                        {/* AI Panel (Collapsible) */}
                         {showAIPanel && (
                             <View style={styles.aiPanel}>
                                 <TextInput
@@ -473,6 +492,7 @@ const TenantLeadScreen = ({ navigation }) => {
                                 </TouchableOpacity>
                             </View>
                         )}
+                        */}
                     </Animated.View>
                 );
 
@@ -551,7 +571,7 @@ const TenantLeadScreen = ({ navigation }) => {
                         {/* Quick Select */}
                         <Text style={styles.quickSelectLabel}>Quick select:</Text>
                         <View style={styles.budgetChips}>
-                            {BUDGET_OPTIONS.map((option) => (
+                            {(BUDGET_PRESETS[countryCode] || BUDGET_PRESETS.KE).map((option) => (
                                 <TouchableOpacity
                                     key={option.id}
                                     style={[
@@ -661,7 +681,6 @@ const TenantLeadScreen = ({ navigation }) => {
                             style={styles.headerLogo}
                             resizeMode="contain"
                         />
-                        <Text style={styles.logoText}>yoombaa</Text>
                     </View>
                     <TouchableOpacity
                         style={styles.agentButton}
@@ -757,9 +776,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerLogo: {
-        width: 28,
-        height: 28,
-        tintColor: '#FE9200',
+        width: 36,
+        height: 36,
     },
     logoText: {
         fontSize: 20,
