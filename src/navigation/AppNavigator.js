@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View, StyleSheet, Text, Platform, Animated } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 // Auth Screens
@@ -31,37 +31,9 @@ const Tab = createBottomTabNavigator();
 const COLORS = {
   primary: '#FE9200',
   primaryLight: '#FFF5E6',
-  inactive: '#6B7280',
+  inactive: '#9CA3AF',
   background: '#FFFFFF',
-  border: '#F3F4F6',
-  text: '#1F2937',
-};
-
-// Custom Tab Bar Icon - Pill Style (like the reference design)
-const TabIcon = ({ focused, icon, label, badge }) => {
-  if (focused) {
-    // Active state - Pill with icon + label
-    return (
-      <View style={styles.activePill}>
-        <Feather name={icon} size={18} color={COLORS.primary} />
-        <Text style={styles.activeLabel}>{label}</Text>
-      </View>
-    );
-  }
-
-  // Inactive state - Just icon
-  return (
-    <View style={styles.inactiveTab}>
-      <View style={styles.iconWrapper}>
-        <Feather name={icon} size={22} color={COLORS.inactive} />
-        {badge > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
+  border: '#E5E7EB',
 };
 
 // Auth Stack (Unauthenticated users)
@@ -87,62 +59,77 @@ const AuthStack = () => {
 const TenantTabNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: styles.tabBar,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarIcon: ({ focused }) => {
+          let iconName;
+          let label;
+
+          switch (route.name) {
+            case 'Dashboard':
+              iconName = 'home';
+              label = 'Home';
+              break;
+            case 'Requests':
+              iconName = 'file-text';
+              label = 'Requests';
+              break;
+            case 'Messages':
+              iconName = 'message-square';
+              label = 'Messages';
+              break;
+            case 'Support':
+              iconName = 'headphones';
+              label = 'Support';
+              break;
+            case 'Settings':
+              iconName = 'settings';
+              label = 'Settings';
+              break;
+            default:
+              iconName = 'circle';
+              label = '';
+          }
+
+          const showBadge = route.name === 'Messages';
+
+          if (focused) {
+            // Active - Pill Style
+            return (
+              <View style={styles.activePill}>
+                <Feather name={iconName} size={18} color={COLORS.primary} />
+                <Text style={styles.activeLabel}>{label}</Text>
+              </View>
+            );
+          }
+
+          // Inactive - Just Icon
+          return (
+            <View style={styles.inactiveIcon}>
+              <Feather name={iconName} size={22} color={COLORS.inactive} />
+              {showBadge && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>2</Text>
+                </View>
+              )}
+            </View>
+          );
+        },
         tabBarShowLabel: false,
-      }}
+      })}
     >
-      <Tab.Screen
-        name="Dashboard"
-        component={TenantDashboardScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="home" label="Home" />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Requests"
-        component={MyRequestsScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="file-text" label="Requests" />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Messages"
-        component={MessagesScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="message-square" label="Messages" badge={2} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Support"
-        component={SupportScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="headphones" label="Support" />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="settings" label="Settings" />
-          ),
-        }}
-      />
+      <Tab.Screen name="Dashboard" component={TenantDashboardScreen} />
+      <Tab.Screen name="Requests" component={MyRequestsScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Support" component={SupportScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 };
 
-// Main Stack (Authenticated users - includes tabs + modal screens)
+// Main Stack (Authenticated users)
 const MainStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -190,48 +177,51 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    height: Platform.OS === 'ios' ? 88 : 68,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-    paddingHorizontal: 8,
+    height: Platform.OS === 'ios' ? 90 : 65,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 8,
+    paddingHorizontal: 10,
   },
-  // Active Pill Style
+  tabBarItem: {
+    paddingVertical: 0,
+    marginVertical: 0,
+  },
+  // Active Pill
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 25,
-    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 5,
+    minWidth: 80,
   },
   activeLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.primary,
   },
-  // Inactive Tab
-  inactiveTab: {
+  // Inactive Icon
+  inactiveIcon: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  iconWrapper: {
     position: 'relative',
+    paddingVertical: 8,
   },
   // Badge
   badge: {
     position: 'absolute',
-    top: -6,
-    right: -10,
+    top: 2,
+    right: -8,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
   },
   badgeText: {
     color: '#FFFFFF',
