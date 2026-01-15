@@ -41,7 +41,7 @@ const ProfileScreen = ({ navigation }) => {
 
     useEffect(() => {
         if (userProfile) {
-            setFullName(userProfile.full_name || '');
+            setFullName(userProfile.name || '');
             setCity(userProfile.city || '');
             setPhone(userProfile.phone || '');
             setPhoneVerified(userProfile.phone_verified || false);
@@ -64,7 +64,7 @@ const ProfileScreen = ({ navigation }) => {
                 .upsert({
                     id: user.id,
                     email: user.email,
-                    full_name: fullName.trim(),
+                    name: fullName.trim(),
                     city: city.trim(),
                     phone: phone.trim(),
                     updated_at: new Date().toISOString(),

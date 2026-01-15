@@ -82,7 +82,7 @@ const TenantDashboardScreen = ({ navigation }) => {
     };
 
     const getUserName = () => {
-        if (userProfile?.full_name) return userProfile.full_name.split(' ')[0];
+        if (userProfile?.name) return userProfile.name.split(' ')[0];
         if (user?.email) return user.email.split('@')[0];
         return 'there';
     };
