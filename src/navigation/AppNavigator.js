@@ -189,11 +189,6 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 88 : 70,
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 10,
   },
   tabIconContainer: {
     alignItems: 'center',
