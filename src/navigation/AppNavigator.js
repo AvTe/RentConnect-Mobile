@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text, Platform, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 // Auth Screens
@@ -32,7 +32,32 @@ const COLORS = {
   primary: '#FE9200',
   inactive: '#9CA3AF',
   background: '#FFFFFF',
-  border: '#E5E7EB',
+  border: '#F3F4F6',
+  text: '#1F2937',
+};
+
+// Custom Tab Bar Icon with animation
+const TabIcon = ({ focused, icon, label, badge }) => {
+  return (
+    <View style={styles.tabIconContainer}>
+      {focused && <View style={styles.activeIndicator} />}
+      <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
+        <Feather
+          name={icon}
+          size={22}
+          color={focused ? COLORS.primary : COLORS.inactive}
+        />
+        {badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>
+        {label}
+      </Text>
+    </View>
+  );
 };
 
 // Auth Stack (Unauthenticated users)
@@ -54,85 +79,60 @@ const AuthStack = () => {
   );
 };
 
-// Tenant Bottom Tab Navigator
+// Tenant Bottom Tab Navigator - Modern Design
 const TenantTabNavigator = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.inactive,
-        tabBarStyle: {
-          backgroundColor: COLORS.background,
-          borderTopWidth: 1,
-          borderTopColor: COLORS.border,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          switch (route.name) {
-            case 'Dashboard':
-              iconName = 'grid';
-              break;
-            case 'Requests':
-              iconName = 'file-text';
-              break;
-            case 'Messages':
-              iconName = 'message-square';
-              break;
-            case 'Support':
-              iconName = 'headphones';
-              break;
-            case 'Settings':
-              iconName = 'settings';
-              break;
-            default:
-              iconName = 'circle';
-          }
-          return <Feather name={iconName} size={22} color={color} />;
-        },
-      })}
+        tabBarStyle: styles.tabBar,
+        tabBarShowLabel: false,
+      }}
     >
       <Tab.Screen
         name="Dashboard"
         component={TenantDashboardScreen}
-        options={{ tabBarLabel: 'Home' }}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="grid" label="Home" />
+          ),
+        }}
       />
       <Tab.Screen
         name="Requests"
         component={MyRequestsScreen}
-        options={{ tabBarLabel: 'My Requests' }}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="file-text" label="My Reque..." />
+          ),
+        }}
       />
       <Tab.Screen
         name="Messages"
         component={MessagesScreen}
         options={{
-          tabBarLabel: 'Messages',
-          tabBarBadge: 2,
-          tabBarBadgeStyle: {
-            backgroundColor: COLORS.primary,
-            color: '#FFFFFF',
-            fontSize: 10,
-            minWidth: 18,
-            height: 18,
-          },
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="message-square" label="Messages" badge={2} />
+          ),
         }}
       />
       <Tab.Screen
         name="Support"
         component={SupportScreen}
-        options={{ tabBarLabel: 'Support' }}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="headphones" label="Support" />
+          ),
+        }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ tabBarLabel: 'Settings' }}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="settings" label="Settings" />
+          ),
+        }}
       />
     </Tab.Navigator>
   );
@@ -181,6 +181,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
+  },
+  tabBar: {
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    height: Platform.OS === 'ios' ? 88 : 70,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  tabIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 4,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    top: -8,
+    width: 24,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
+  },
+  iconWrapper: {
+    position: 'relative',
+    marginBottom: 4,
+  },
+  iconWrapperActive: {
+    transform: [{ scale: 1.1 }],
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tabLabel: {
+    fontSize: 10,
+    color: COLORS.inactive,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  tabLabelActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });
 

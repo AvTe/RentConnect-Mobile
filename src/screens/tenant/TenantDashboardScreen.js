@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,8 @@ import {
     ImageBackground,
     RefreshControl,
     ActivityIndicator,
+    Animated,
+    Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -16,17 +18,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
+const { width } = Dimensions.get('window');
+
 const COLORS = {
     primary: '#FE9200',
     primaryLight: '#FFF5E6',
+    primaryDark: '#E58300',
     background: '#F8F9FB',
     card: '#FFFFFF',
     text: '#1F2937',
     textSecondary: '#6B7280',
+    textLight: '#9CA3AF',
     border: '#E5E7EB',
     success: '#10B981',
     warning: '#F59E0B',
     error: '#EF4444',
+    purple: '#8B5CF6',
+    amber: '#D97706',
 };
 
 const STATUS_COLORS = {
@@ -44,9 +52,14 @@ const TenantDashboardScreen = ({ navigation }) => {
     const [stats, setStats] = useState({ active: 0, views: 0, replies: 0 });
     const [recentRequests, setRecentRequests] = useState([]);
 
+    // Animation refs
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim1 = useRef(new Animated.Value(0.8)).current;
+    const scaleAnim2 = useRef(new Animated.Value(0.8)).current;
+    const scaleAnim3 = useRef(new Animated.Value(0.8)).current;
+
     const fetchData = useCallback(async () => {
         try {
-            // Fetch user's leads
             const { data: leads, error } = await supabase
                 .from('leads')
                 .select('*')
@@ -61,7 +74,7 @@ const TenantDashboardScreen = ({ navigation }) => {
                 setStats({
                     active: activeCount,
                     views: totalViews,
-                    replies: 0, // Will be implemented with agent replies
+                    replies: 0,
                 });
             }
         } catch (error) {
@@ -76,6 +89,38 @@ const TenantDashboardScreen = ({ navigation }) => {
         fetchData();
     }, [fetchData]);
 
+    useEffect(() => {
+        // Animate stats cards on load
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim1, {
+                toValue: 1,
+                friction: 6,
+                tension: 80,
+                delay: 100,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim2, {
+                toValue: 1,
+                friction: 6,
+                tension: 80,
+                delay: 200,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim3, {
+                toValue: 1,
+                friction: 6,
+                tension: 80,
+                delay: 300,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [loading]);
+
     const onRefresh = () => {
         setRefreshing(true);
         fetchData();
@@ -85,13 +130,6 @@ const TenantDashboardScreen = ({ navigation }) => {
         if (userProfile?.name) return userProfile.name.split(' ')[0];
         if (user?.email) return user.email.split('@')[0];
         return 'there';
-    };
-
-    const formatBudget = (budget) => {
-        if (!budget) return 'N/A';
-        const num = parseInt(budget);
-        if (num >= 1000) return `KSh ${(num / 1000).toFixed(0)}K`;
-        return `KSh ${num}`;
     };
 
     const getStatusStyle = (status) => {
@@ -108,27 +146,28 @@ const TenantDashboardScreen = ({ navigation }) => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            {/* Header */}
+            {/* Clean Header - Logo Only */}
             <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <Image
-                        source={require('../../../assets/yoombaa logo.png')}
-                        style={styles.logo}
-                        resizeMode="contain"
-                    />
-                    <Text style={styles.logoText}>yoombaa</Text>
-                </View>
+                <Image
+                    source={require('../../../assets/yoombaa logo.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
+                />
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.notificationBtn}>
+                    <TouchableOpacity style={styles.iconButton}>
                         <Feather name="bell" size={22} color={COLORS.text} />
+                        <View style={styles.notificationDot} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={styles.avatarContainer}
+                        style={styles.profileButton}
                         onPress={() => navigation.navigate('Profile')}
                     >
-                        <View style={styles.avatar}>
-                            <Feather name="user" size={20} color={COLORS.primary} />
-                        </View>
+                        <LinearGradient
+                            colors={[COLORS.primary, COLORS.primaryDark]}
+                            style={styles.profileGradient}
+                        >
+                            <Feather name="user" size={18} color="#FFFFFF" />
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -141,7 +180,7 @@ const TenantDashboardScreen = ({ navigation }) => {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
                 }
             >
-                {/* Welcome Banner */}
+                {/* Hero Banner - Improved */}
                 <View style={styles.bannerContainer}>
                     <ImageBackground
                         source={require('../../../assets/hero section img.jpg')}
@@ -149,123 +188,146 @@ const TenantDashboardScreen = ({ navigation }) => {
                         imageStyle={styles.bannerImage}
                     >
                         <LinearGradient
-                            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.3)']}
+                            colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.5)']}
                             style={styles.bannerGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 0, y: 1 }}
                         >
                             <Text style={styles.bannerGreeting}>Jambo, {getUserName()}!</Text>
                             <Text style={styles.bannerText}>
                                 Ready to find your next home? Post a{'\n'}request to let agents come to you.
                             </Text>
                             <TouchableOpacity
-                                style={styles.postButton}
+                                style={styles.ctaButton}
                                 onPress={() => navigation.navigate('TenantLead')}
-                                activeOpacity={0.9}
+                                activeOpacity={0.85}
                             >
-                                <Feather name="plus-circle" size={20} color="#FFFFFF" />
-                                <Text style={styles.postButtonText}>Post New Request</Text>
+                                <Feather name="plus-circle" size={16} color="#FFFFFF" />
+                                <Text style={styles.ctaButtonText}>Post New Request</Text>
                             </TouchableOpacity>
                         </LinearGradient>
                     </ImageBackground>
                 </View>
 
-                {/* Stats Cards */}
-                <View style={styles.statsContainer}>
-                    <View style={styles.statCard}>
-                        <View style={[styles.statIconContainer, { backgroundColor: COLORS.primaryLight }]}>
+                {/* Stats Cards - Improved */}
+                <Animated.View style={[styles.statsContainer, { opacity: fadeAnim }]}>
+                    <Animated.View style={[styles.statCard, { transform: [{ scale: scaleAnim1 }] }]}>
+                        <View style={[styles.statIconWrapper, { backgroundColor: COLORS.primaryLight }]}>
                             <Feather name="home" size={18} color={COLORS.primary} />
                         </View>
-                        <Text style={styles.statLabel}>ACTIVE</Text>
                         <Text style={styles.statValue}>{stats.active}</Text>
-                        <Text style={styles.statSubtext}>
-                            <Feather name="zap" size={12} color={COLORS.primary} /> JUST NOW
-                        </Text>
-                    </View>
-
-                    <View style={styles.statCard}>
-                        <View style={[styles.statIconContainer, { backgroundColor: '#EDE9FE' }]}>
-                            <Feather name="eye" size={18} color="#8B5CF6" />
+                        <Text style={styles.statLabel}>ACTIVE</Text>
+                        <View style={styles.statMeta}>
+                            <Feather name="zap" size={10} color={COLORS.primary} />
+                            <Text style={styles.statMetaText}>JUST NOW</Text>
                         </View>
-                        <Text style={styles.statLabel}>VIEWS</Text>
+                    </Animated.View>
+
+                    <Animated.View style={[styles.statCard, { transform: [{ scale: scaleAnim2 }] }]}>
+                        <View style={[styles.statIconWrapper, { backgroundColor: '#EDE9FE' }]}>
+                            <Feather name="eye" size={18} color={COLORS.purple} />
+                        </View>
                         <Text style={styles.statValue}>{stats.views}</Text>
-                        <Text style={styles.statSubtext}>
-                            <Feather name="plus" size={12} color="#8B5CF6" /> 12 THIS WEEK
-                        </Text>
-                    </View>
-
-                    <View style={styles.statCard}>
-                        <View style={[styles.statIconContainer, { backgroundColor: '#FEF3C7' }]}>
-                            <Feather name="mail" size={18} color="#D97706" />
+                        <Text style={styles.statLabel}>VIEWS</Text>
+                        <View style={styles.statMeta}>
+                            <Feather name="trending-up" size={10} color={COLORS.purple} />
+                            <Text style={[styles.statMetaText, { color: COLORS.purple }]}>+12 THIS WEEK</Text>
                         </View>
-                        <Text style={styles.statLabel}>REPLIES</Text>
+                    </Animated.View>
+
+                    <Animated.View style={[styles.statCard, { transform: [{ scale: scaleAnim3 }] }]}>
+                        <View style={[styles.statIconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                            <Feather name="mail" size={18} color={COLORS.amber} />
+                        </View>
                         <Text style={styles.statValue}>{stats.replies}</Text>
-                        <Text style={styles.statSubtext}>
-                            <Feather name="clock" size={12} color="#D97706" /> 3 PENDING
-                        </Text>
-                    </View>
-                </View>
+                        <Text style={styles.statLabel}>REPLIES</Text>
+                        <View style={styles.statMeta}>
+                            <Feather name="clock" size={10} color={COLORS.amber} />
+                            <Text style={[styles.statMetaText, { color: COLORS.amber }]}>3 PENDING</Text>
+                        </View>
+                    </Animated.View>
+                </Animated.View>
 
                 {/* My Requests Section */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>My Requests</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Requests')}>
-                        <Text style={styles.viewAllText}>View All <Feather name="chevron-right" size={14} /></Text>
+                    <TouchableOpacity
+                        style={styles.viewAllButton}
+                        onPress={() => navigation.navigate('Requests')}
+                    >
+                        <Text style={styles.viewAllText}>View All</Text>
+                        <Feather name="chevron-right" size={16} color={COLORS.primary} />
                     </TouchableOpacity>
                 </View>
 
                 {recentRequests.length === 0 ? (
                     <View style={styles.emptyCard}>
-                        <Feather name="inbox" size={40} color={COLORS.textSecondary} />
+                        <View style={styles.emptyIconWrapper}>
+                            <Feather name="inbox" size={32} color={COLORS.textSecondary} />
+                        </View>
                         <Text style={styles.emptyText}>No requests yet</Text>
                         <Text style={styles.emptySubtext}>Post your first rental request!</Text>
                     </View>
                 ) : (
-                    recentRequests.map((request) => (
+                    recentRequests.map((request, index) => (
                         <TouchableOpacity
                             key={request.id}
                             style={styles.requestCard}
                             onPress={() => navigation.navigate('RequestDetail', { requestId: request.id })}
-                            activeOpacity={0.8}
+                            activeOpacity={0.9}
                         >
-                            <View style={styles.requestHeader}>
+                            {/* Card Header */}
+                            <View style={styles.cardHeader}>
                                 <View style={[styles.statusBadge, { backgroundColor: getStatusStyle(request.status).bg }]}>
                                     <Text style={[styles.statusText, { color: getStatusStyle(request.status).text }]}>
                                         {request.status?.toUpperCase()}
                                     </Text>
                                 </View>
-                                <Text style={styles.requestDate}>
-                                    Posted {new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                                </Text>
-                                <View style={styles.budgetContainer}>
+                                <View style={styles.postedDateWrapper}>
+                                    <Feather name="calendar" size={12} color={COLORS.textLight} />
+                                    <Text style={styles.postedDate}>
+                                        Posted {new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Card Content */}
+                            <View style={styles.cardContent}>
+                                <View style={styles.cardMain}>
+                                    <Text style={styles.requestTitle} numberOfLines={1}>
+                                        {request.property_type || 'Property'} In {request.location}
+                                    </Text>
+                                    <View style={styles.locationRow}>
+                                        <Feather name="map-pin" size={13} color={COLORS.primary} />
+                                        <Text style={styles.locationText}>{request.location}</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.budgetSection}>
                                     <Text style={styles.budgetLabel}>BUDGET</Text>
-                                    <Text style={styles.budgetValue}>KSh</Text>
+                                    <Text style={styles.budgetCurrency}>KSh</Text>
                                     <Text style={styles.budgetAmount}>{parseInt(request.budget || 0).toLocaleString()}</Text>
                                     <Text style={styles.budgetPeriod}>/mo</Text>
                                 </View>
                             </View>
 
-                            <Text style={styles.requestTitle}>
-                                {request.property_type} In {request.location}
-                            </Text>
-
-                            <View style={styles.locationRow}>
-                                <Feather name="map-pin" size={14} color={COLORS.primary} />
-                                <Text style={styles.locationText}>{request.location}</Text>
-                            </View>
-
-                            <View style={styles.requestFooter}>
-                                <View style={styles.statsRow}>
-                                    <View style={styles.statItem}>
-                                        <Text style={styles.statItemLabel}>VIEWS</Text>
-                                        <Text style={styles.statItemValue}>{request.views || 0}</Text>
+                            {/* Card Footer */}
+                            <View style={styles.cardFooter}>
+                                <View style={styles.metricsRow}>
+                                    <View style={styles.metricItem}>
+                                        <Feather name="eye" size={13} color={COLORS.textLight} />
+                                        <Text style={styles.metricLabel}>VIEWS</Text>
+                                        <Text style={styles.metricValue}>{request.views || 0}</Text>
                                     </View>
-                                    <View style={styles.statItem}>
-                                        <Text style={styles.statItemLabel}>CONTACTS</Text>
-                                        <Text style={styles.statItemValue}>{request.contacts || 0}</Text>
+                                    <View style={styles.metricDivider} />
+                                    <View style={styles.metricItem}>
+                                        <Feather name="users" size={13} color={COLORS.textLight} />
+                                        <Text style={styles.metricLabel}>CONTACTS</Text>
+                                        <Text style={styles.metricValue}>{request.contacts || 0}</Text>
                                     </View>
                                 </View>
-                                <TouchableOpacity style={styles.manageButton}>
-                                    <Text style={styles.manageText}>Manage</Text>
-                                    <Feather name="chevron-right" size={16} color={COLORS.text} />
+                                <TouchableOpacity style={styles.manageBtn}>
+                                    <Text style={styles.manageBtnText}>Manage</Text>
+                                    <Feather name="chevron-right" size={14} color={COLORS.text} />
                                 </TouchableOpacity>
                             </View>
                         </TouchableOpacity>
@@ -287,64 +349,77 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    // Header Styles
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingVertical: 14,
         backgroundColor: COLORS.card,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
     logo: {
-        width: 32,
-        height: 32,
-    },
-    logoText: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: COLORS.primary,
-        marginLeft: 8,
+        width: 36,
+        height: 36,
     },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
     },
-    notificationBtn: {
-        padding: 8,
+    iconButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
     },
-    avatarContainer: {
+    notificationDot: {
+        position: 'absolute',
+        top: 8,
+        right: 10,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: COLORS.error,
         borderWidth: 2,
-        borderColor: COLORS.primary,
-        borderRadius: 20,
-        padding: 2,
+        borderColor: COLORS.card,
     },
-    avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: COLORS.primaryLight,
+    profileButton: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    profileGradient: {
+        width: 40,
+        height: 40,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    // Scroll
     scrollView: {
         flex: 1,
     },
     scrollContent: {
         padding: 20,
     },
+    // Banner Styles
     bannerContainer: {
         borderRadius: 20,
         overflow: 'hidden',
         marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
     },
     bannerBackground: {
         width: '100%',
-        height: 200,
+        height: 180,
     },
     bannerImage: {
         borderRadius: 20,
@@ -355,209 +430,276 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     bannerGreeting: {
-        fontSize: 28,
+        fontSize: 26,
         fontWeight: '700',
         color: '#FFFFFF',
-        marginBottom: 8,
+        marginBottom: 6,
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     bannerText: {
-        fontSize: 14,
+        fontSize: 13,
         color: 'rgba(255,255,255,0.9)',
-        lineHeight: 20,
-        marginBottom: 16,
+        lineHeight: 19,
+        marginBottom: 14,
     },
-    postButton: {
+    ctaButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.primary,
-        paddingHorizontal: 24,
-        paddingVertical: 14,
-        borderRadius: 30,
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 10,
         alignSelf: 'flex-start',
+        gap: 6,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
-    postButtonText: {
+    ctaButtonText: {
         color: '#FFFFFF',
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '600',
-        marginLeft: 8,
     },
+    // Stats Cards Styles
     statsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 24,
+        gap: 10,
     },
     statCard: {
         flex: 1,
         backgroundColor: COLORS.card,
         borderRadius: 16,
-        padding: 16,
-        marginHorizontal: 4,
+        padding: 14,
         alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.06,
         shadowRadius: 8,
-        elevation: 2,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
-    statIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+    statIconWrapper: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
-    },
-    statLabel: {
-        fontSize: 11,
-        color: COLORS.textSecondary,
-        fontWeight: '500',
-        marginBottom: 4,
+        marginBottom: 10,
     },
     statValue: {
         fontSize: 28,
-        fontWeight: '700',
+        fontWeight: '800',
         color: COLORS.text,
-        marginBottom: 4,
+        lineHeight: 32,
     },
-    statSubtext: {
+    statLabel: {
         fontSize: 10,
         color: COLORS.textSecondary,
-        fontWeight: '500',
+        fontWeight: '600',
+        letterSpacing: 0.5,
+        marginTop: 2,
+        marginBottom: 6,
     },
+    statMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+    },
+    statMetaText: {
+        fontSize: 9,
+        color: COLORS.primary,
+        fontWeight: '600',
+    },
+    // Section Header
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 14,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: COLORS.text,
     },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
     viewAllText: {
-        fontSize: 14,
+        fontSize: 13,
         color: COLORS.primary,
         fontWeight: '600',
     },
+    // Empty State
     emptyCard: {
         backgroundColor: COLORS.card,
         borderRadius: 16,
         padding: 40,
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderStyle: 'dashed',
+    },
+    emptyIconWrapper: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
     },
     emptyText: {
         fontSize: 16,
         fontWeight: '600',
         color: COLORS.text,
-        marginTop: 12,
     },
     emptySubtext: {
-        fontSize: 14,
+        fontSize: 13,
         color: COLORS.textSecondary,
         marginTop: 4,
     },
+    // Request Card
     requestCard: {
         backgroundColor: COLORS.card,
         borderRadius: 16,
-        padding: 16,
         marginBottom: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        overflow: 'hidden',
     },
-    requestHeader: {
+    cardHeader: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 10,
     },
     statusBadge: {
         paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderRadius: 6,
     },
     statusText: {
-        fontSize: 11,
-        fontWeight: '600',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
-    requestDate: {
+    postedDateWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    postedDate: {
         fontSize: 12,
-        color: COLORS.textSecondary,
-        marginLeft: 10,
-        flex: 1,
+        color: COLORS.textLight,
     },
-    budgetContainer: {
+    cardContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingBottom: 14,
+    },
+    cardMain: {
+        flex: 1,
+        paddingRight: 12,
+    },
+    requestTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.text,
+        marginBottom: 6,
+    },
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    locationText: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+    },
+    budgetSection: {
         alignItems: 'flex-end',
     },
     budgetLabel: {
-        fontSize: 10,
-        color: COLORS.textSecondary,
+        fontSize: 9,
+        color: COLORS.textLight,
+        fontWeight: '600',
+        letterSpacing: 0.5,
     },
-    budgetValue: {
+    budgetCurrency: {
         fontSize: 12,
         color: COLORS.primary,
         fontWeight: '500',
     },
     budgetAmount: {
-        fontSize: 18,
+        fontSize: 20,
         color: COLORS.primary,
         fontWeight: '700',
     },
     budgetPeriod: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
+        fontSize: 11,
+        color: COLORS.textLight,
     },
-    requestTitle: {
-        fontSize: 17,
-        fontWeight: '600',
-        color: COLORS.text,
-        marginBottom: 8,
-    },
-    locationRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    locationText: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
-        marginLeft: 6,
-    },
-    requestFooter: {
+    cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        paddingTop: 12,
+        backgroundColor: COLORS.background,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
     },
-    statsRow: {
-        flexDirection: 'row',
-        gap: 24,
-    },
-    statItem: {
-        alignItems: 'flex-start',
-    },
-    statItemLabel: {
-        fontSize: 10,
-        color: COLORS.textSecondary,
-        marginBottom: 2,
-    },
-    statItemValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: COLORS.text,
-    },
-    manageButton: {
+    metricsRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    manageText: {
+    metricItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    metricLabel: {
+        fontSize: 9,
+        color: COLORS.textLight,
+        fontWeight: '600',
+        letterSpacing: 0.3,
+    },
+    metricValue: {
         fontSize: 14,
+        fontWeight: '700',
         color: COLORS.text,
-        fontWeight: '500',
+    },
+    metricDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: COLORS.border,
+        marginHorizontal: 16,
+    },
+    manageBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    manageBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.text,
     },
 });
 
