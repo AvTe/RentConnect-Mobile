@@ -23,7 +23,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 // Google OAuth Client IDs
 const GOOGLE_WEB_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = '458457543968-17k4rn46bmko62lie4u8j7c2d3rcqr2t.apps.googleusercontent.com';
+// Note: androidClientId is for STANDALONE BUILDS only, not Expo Go
 
 const SignUpScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -107,11 +107,12 @@ const SignUpScreen = ({ navigation }) => {
     }
   };
 
-  // Use Google Auth with proper client IDs for each platform
+  // Use Google Auth - for Expo Go, only expoClientId works
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: GOOGLE_WEB_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+    // Uncomment for STANDALONE BUILDS:
+    // androidClientId: 'YOUR_ANDROID_CLIENT_ID',
   });
 
   // Handle Google auth response
