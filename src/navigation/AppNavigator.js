@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View, StyleSheet, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +21,14 @@ import SplashScreen from '../screens/SplashScreen';
 import TenantDashboardScreen from '../screens/tenant/TenantDashboardScreen';
 import MyRequestsScreen from '../screens/tenant/MyRequestsScreen';
 import MessagesScreen from '../screens/tenant/MessagesScreen';
+
+// Agent Screens
+import AgentLeadsScreen from '../screens/agent/AgentLeadsScreen';
+import AgentWalletScreen from '../screens/agent/AgentWalletScreen';
+import AgentPropertiesScreen from '../screens/agent/AgentPropertiesScreen';
+import AgentAccountScreen from '../screens/agent/AgentAccountScreen';
+import AgentSettingsScreen from '../screens/agent/AgentSettingsScreen';
+import AgentRewardsScreen from '../screens/agent/AgentRewardsScreen';
 
 // Profile & Settings Screens
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -41,13 +49,89 @@ const COLORS = {
   dark: '#1F2937',
 };
 
-// Custom Tab Bar Component with Center + Button
-const CustomTabBar = ({ state, descriptors, navigation }) => {
+// Agent Tab Bar Component
+const AgentTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
 
-  // Get tabs - filtering out the dummy "Add" screen
-  const leftTabs = state.routes.slice(0, 2); // Home, Requests
-  const rightTabs = state.routes.slice(3); // Support, Settings
+  const renderTab = (route, index) => {
+    const isFocused = state.index === index;
+
+    let iconName;
+    let label;
+
+    switch (route.name) {
+      case 'AgentLeads':
+        iconName = 'grid';
+        label = 'Leads';
+        break;
+      case 'AgentWallet':
+        iconName = 'credit-card';
+        label = 'Wallet';
+        break;
+      case 'AgentProperties':
+        iconName = 'home';
+        label = 'Properties';
+        break;
+      case 'AgentAccount':
+        iconName = 'user';
+        label = 'Profile';
+        break;
+      default:
+        iconName = 'circle';
+        label = '';
+    }
+
+    const onPress = () => {
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name);
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        key={route.key}
+        style={styles.agentTabItem}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Feather
+          name={iconName}
+          size={22}
+          color={isFocused ? COLORS.primary : COLORS.inactive}
+        />
+        <Text
+          style={[
+            styles.agentTabLabel,
+            { color: isFocused ? COLORS.primary : COLORS.inactive },
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={[styles.agentTabBarWrapper, { paddingBottom: insets.bottom }]}>
+      <View style={styles.agentTabBarContainer}>
+        {state.routes.map((route, index) => renderTab(route, index))}
+      </View>
+    </View>
+  );
+};
+
+// Tenant Custom Tab Bar Component with Center + Button
+const TenantTabBar = ({ state, descriptors, navigation }) => {
+  const insets = useSafeAreaInsets();
+
+  const leftTabs = state.routes.slice(0, 2);
+  const rightTabs = state.routes.slice(3);
 
   const renderTab = (route, index, actualIndex) => {
     const isFocused = state.index === actualIndex;
@@ -117,12 +201,10 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   return (
     <View style={[styles.tabBarWrapper, { paddingBottom: insets.bottom }]}>
       <View style={styles.tabBarContainer}>
-        {/* Left Tabs */}
         <View style={styles.tabGroup}>
           {leftTabs.map((route, index) => renderTab(route, index, index))}
         </View>
 
-        {/* Center Add Button */}
         <TouchableOpacity
           style={styles.addButtonWrapper}
           onPress={handleAddPress}
@@ -138,7 +220,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Right Tabs */}
         <View style={styles.tabGroup}>
           {rightTabs.map((route, index) => renderTab(route, index, index + 3))}
         </View>
@@ -164,14 +245,14 @@ const AuthStack = () => {
   );
 };
 
-// Dummy component for the center tab (not actually rendered)
+// Dummy component for the center tab
 const DummyScreen = () => null;
 
-// Tenant Tab Navigator - 4 tabs + center button
+// Tenant Tab Navigator
 const TenantTabNavigator = () => {
   return (
     <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
+      tabBar={(props) => <TenantTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Dashboard" component={TenantDashboardScreen} />
@@ -187,8 +268,23 @@ const TenantTabNavigator = () => {
   );
 };
 
-// Main Stack
-const MainStack = () => {
+// Agent Tab Navigator
+const AgentTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <AgentTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="AgentLeads" component={AgentLeadsScreen} />
+      <Tab.Screen name="AgentWallet" component={AgentWalletScreen} />
+      <Tab.Screen name="AgentProperties" component={AgentPropertiesScreen} />
+      <Tab.Screen name="AgentAccount" component={AgentAccountScreen} />
+    </Tab.Navigator>
+  );
+};
+
+// Main Stack for Tenants
+const TenantMainStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="TenantTabs" component={TenantTabNavigator} />
@@ -202,20 +298,67 @@ const MainStack = () => {
         component={ProfileScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
+      <Stack.Screen
+        name="Support"
+        component={SupportScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Main Stack for Agents
+const AgentMainStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AgentTabs" component={AgentTabNavigator} />
+      <Stack.Screen
+        name="AgentSettings"
+        component={AgentSettingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentRewards"
+        component={AgentRewardsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="Support"
+        component={SupportScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 };
 
 const AppNavigator = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, isAgent, isTenant } = useAuth();
 
   if (loading) {
     return <SplashScreen />;
   }
 
+  // Determine which stack to show
+  const renderMainStack = () => {
+    if (!user) return <AuthStack />;
+
+    // Check user type
+    if (isAgent && isAgent()) {
+      return <AgentMainStack />;
+    }
+
+    // Default to tenant stack
+    return <TenantMainStack />;
+  };
+
   return (
     <NavigationContainer>
-      {user ? <MainStack /> : <AuthStack />}
+      {renderMainStack()}
     </NavigationContainer>
   );
 };
@@ -227,7 +370,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  // Tab Bar Styles
+  // Tenant Tab Bar Styles
   tabBarWrapper: {
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
@@ -250,7 +393,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
-  // Active Pill
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -266,13 +408,11 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.semiBold,
     color: COLORS.primary,
   },
-  // Inactive Tab
   inactiveTab: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
-  // Center Add Button
   addButtonWrapper: {
     marginTop: -30,
     borderRadius: 30,
@@ -285,6 +425,30 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Agent Tab Bar Styles
+  agentTabBarWrapper: {
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  agentTabBarContainer: {
+    flexDirection: 'row',
+    height: 65,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+  },
+  agentTabItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    minWidth: 60,
+  },
+  agentTabLabel: {
+    fontSize: 11,
+    fontFamily: FONTS.medium,
+    marginTop: 4,
   },
 });
 
