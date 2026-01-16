@@ -23,8 +23,8 @@ import { FONTS } from '../constants/theme';
 WebBrowser.maybeCompleteAuthSession();
 
 // Google OAuth Client IDs
-// Using Web Client ID with Expo's auth proxy for Expo Go
 const GOOGLE_WEB_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = '458457543968-17k4rn46bmko62lie4u8j7c2d3rcqr2t.apps.googleusercontent.com';
 
 const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -35,14 +35,12 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
 
-  // Use Google Auth with Expo's proxy
-  // expoClientId uses the web client ID with Expo's auth.expo.io proxy
+  // Use Google Auth with proper client IDs for each platform
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: GOOGLE_WEB_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    // For standalone builds, you'd also add:
-    // androidClientId: 'YOUR_ANDROID_CLIENT_ID',
-    // iosClientId: 'YOUR_IOS_CLIENT_ID',
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+    // iosClientId: 'YOUR_IOS_CLIENT_ID', // Add when you create iOS client
   });
 
   // Handle Google auth response

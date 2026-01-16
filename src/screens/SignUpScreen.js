@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,10 +16,14 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth Client IDs
+const GOOGLE_WEB_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = '458457543968-17k4rn46bmko62lie4u8j7c2d3rcqr2t.apps.googleusercontent.com';
 
 const SignUpScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -103,49 +107,71 @@ const SignUpScreen = ({ navigation }) => {
     }
   };
 
+  // Use Google Auth with proper client IDs for each platform
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: GOOGLE_WEB_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+  });
+
+  // Handle Google auth response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      handleGoogleToken(authentication?.accessToken);
+    } else if (response?.type === 'error') {
+      console.error('Google auth error:', response.error);
+      Alert.alert('Error', 'Failed to sign up with Google');
+      setGoogleLoading(false);
+    } else if (response?.type === 'cancel' || response?.type === 'dismiss') {
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleToken = async (accessToken) => {
+    if (!accessToken) {
+      console.error('No access token received');
+      setGoogleLoading(false);
+      return;
+    }
+
+    try {
+      console.log('Got Google access token, signing in to Supabase...');
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: accessToken,
+      });
+
+      if (error) {
+        console.error('Supabase sign in error:', error);
+        Alert.alert('Error', 'Failed to complete sign up with Google');
+      } else {
+        console.log('Signed up successfully:', data?.user?.email);
+      }
+    } catch (error) {
+      console.error('Error signing up:', error);
+      Alert.alert('Error', 'Failed to complete sign up');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   const handleGoogleSignUp = async () => {
     try {
       setGoogleLoading(true);
+      console.log('Starting Google OAuth sign up...');
 
-      const redirectUrl = makeRedirectUri({
-        scheme: 'yoombaa',
-        path: 'auth/callback',
-      });
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl
-        );
-
-        if (result.type === 'success') {
-          const url = result.url;
-          const params = new URLSearchParams(url.split('#')[1]);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-
-          if (accessToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-          }
-        }
+      if (!request) {
+        Alert.alert('Please Wait', 'Google Sign Up is initializing. Please try again.');
+        setGoogleLoading(false);
+        return;
       }
+
+      await promptAsync();
     } catch (error) {
       console.error('Google Sign Up Error:', error);
-      Alert.alert('Error', 'Failed to sign up with Google. Please try again.');
-    } finally {
+      Alert.alert('Error', 'Failed to start Google sign up');
       setGoogleLoading(false);
     }
   };
