@@ -8,6 +8,7 @@ import {
     TextInput,
     RefreshControl,
     ActivityIndicator,
+    Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,7 +43,6 @@ const AgentLeadsScreen = ({ navigation }) => {
     const [leads, setLeads] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [totalLeads, setTotalLeads] = useState(0);
-    const [filteredCount, setFilteredCount] = useState(0);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -57,6 +57,11 @@ const AgentLeadsScreen = ({ navigation }) => {
         return 'Agent';
     };
 
+    const getUserInitials = () => {
+        const name = getUserName();
+        return name.charAt(0).toUpperCase();
+    };
+
     const fetchLeads = useCallback(async () => {
         try {
             const { data, error, count } = await supabase
@@ -69,7 +74,6 @@ const AgentLeadsScreen = ({ navigation }) => {
 
             setLeads(data || []);
             setTotalLeads(count || 0);
-            setFilteredCount(data?.length || 0);
         } catch (error) {
             console.error('Error fetching leads:', error);
             toast.error('Failed to load leads');
@@ -88,36 +92,21 @@ const AgentLeadsScreen = ({ navigation }) => {
         fetchLeads();
     };
 
-    const handleUnlock = async (lead) => {
-        toast.info(`Unlock feature coming soon for ${lead.tenant_name}`);
-    };
-
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     };
 
     const formatBudget = (budget) => {
-        if (!budget) return 'Budget TBD';
-        if (budget >= 1000) {
-            return `KSh ${Math.round(budget / 1000)}K`;
-        }
-        return `KSh ${budget.toLocaleString()}`;
+        if (!budget) return '0';
+        return budget.toLocaleString();
     };
 
-    const getSlotStatus = (lead) => {
-        const unlocked = lead.unlocked_count || 0;
-        const maxSlots = 3;
-        const available = maxSlots - unlocked;
-
-        if (available === 0) return { text: 'FULL', color: COLORS.error };
-        if (available === maxSlots) return { text: 'AVAILABLE', color: COLORS.success };
-        return { text: 'OPEN', color: COLORS.warning };
-    };
-
-    const isExpired = (lead) => {
-        if (!lead.move_in_date) return false;
-        return new Date(lead.move_in_date) < new Date();
+    const getLeadStatus = (lead) => {
+        if (!lead.move_in_date) return { text: 'ACTIVE', color: COLORS.success, bg: COLORS.successLight };
+        const isExpired = new Date(lead.move_in_date) < new Date();
+        if (isExpired) return { text: 'EXPIRED', color: COLORS.expired, bg: '#F3F4F6' };
+        return { text: 'ACTIVE', color: COLORS.success, bg: COLORS.successLight };
     };
 
     const filteredLeads = leads.filter(lead => {
@@ -130,130 +119,74 @@ const AgentLeadsScreen = ({ navigation }) => {
     });
 
     const LeadCard = ({ lead }) => {
-        const expired = isExpired(lead);
-        const slotStatus = getSlotStatus(lead);
-        const unlocked = lead.unlocked_count || 0;
+        const status = getLeadStatus(lead);
+        const isExpired = status.text === 'EXPIRED';
         const views = lead.views || 0;
+        const contacts = lead.unlocked_count || 0;
 
         return (
-            <View style={[styles.leadCard, expired && styles.expiredCard]}>
-                {/* Top Row - Stats & Budget */}
-                <View style={styles.leadTopRow}>
-                    <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                            <Feather name="users" size={14} color={expired ? COLORS.expired : COLORS.textSecondary} />
-                            <Text style={[styles.statText, expired && styles.expiredText]}>{unlocked}</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                            <Feather name="eye" size={14} color={expired ? COLORS.expired : COLORS.textSecondary} />
-                            <Text style={[styles.statText, expired && styles.expiredText]}>{views}</Text>
-                        </View>
+            <View style={[styles.leadCard, isExpired && styles.expiredCard]}>
+                {/* Top Row - Status & Posted Date */}
+                <View style={styles.cardTopRow}>
+                    <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+                        <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
                     </View>
-                    <View style={[styles.budgetBadge, expired && styles.expiredBudgetBadge]}>
-                        <Feather name="dollar-sign" size={12} color={expired ? COLORS.expired : COLORS.primary} />
-                        <Text style={[styles.budgetText, expired && styles.expiredText]}>
-                            {formatBudget(lead.budget)}
-                        </Text>
+                    <View style={styles.postedRow}>
+                        <Feather name="calendar" size={12} color={COLORS.textSecondary} />
+                        <Text style={styles.postedText}>Posted {formatDate(lead.created_at)}</Text>
                     </View>
                 </View>
 
                 {/* Title */}
-                <Text style={[styles.leadTitle, expired && styles.expiredText]}>
-                    Looking for {lead.property_type || 'Property'}
+                <Text style={[styles.leadTitle, isExpired && styles.expiredText]}>
+                    {lead.property_type || 'Property'} In {lead.location || 'Location'}
                 </Text>
 
-                {/* Tags Row */}
-                <View style={styles.tagsRow}>
-                    <View style={[styles.tag, expired && styles.expiredTag]}>
-                        <Feather name="map-pin" size={12} color={expired ? COLORS.expired : COLORS.textSecondary} />
-                        <Text style={[styles.tagText, expired && styles.expiredText]}>{lead.location || 'TBD'}</Text>
-                    </View>
-                    <View style={[styles.tag, expired && styles.expiredTag]}>
-                        <Feather name="home" size={12} color={expired ? COLORS.expired : COLORS.textSecondary} />
-                        <Text style={[styles.tagText, expired && styles.expiredText]}>{lead.property_type || 'Any'}</Text>
-                    </View>
-                    <View style={[styles.tag, expired && styles.expiredTag]}>
-                        <Feather name="calendar" size={12} color={expired ? COLORS.expired : COLORS.textSecondary} />
-                        <Text style={[styles.tagText, expired && styles.expiredText]}>
-                            {formatDate(lead.move_in_date || lead.created_at)}
-                        </Text>
-                    </View>
+                {/* Location Row */}
+                <View style={styles.locationRow}>
+                    <Feather name="map-pin" size={14} color={COLORS.textSecondary} />
+                    <Text style={[styles.locationText, isExpired && styles.expiredText]}>
+                        {lead.location || 'Location TBD'}
+                    </Text>
                 </View>
 
-                {/* Slots */}
-                <View style={styles.slotsRow}>
-                    <Text style={[styles.slotsLabel, expired && styles.expiredText]}>SLOTS</Text>
-                    <View style={styles.slotsBoxes}>
-                        {[1, 2, 3].map((slot) => (
-                            <View
-                                key={slot}
-                                style={[
-                                    styles.slotBox,
-                                    slot <= unlocked && styles.slotBoxFilled,
-                                    expired && styles.expiredSlotBox,
-                                ]}
-                            >
-                                <Text style={[
-                                    styles.slotNumber,
-                                    slot <= unlocked && styles.slotNumberFilled,
-                                    expired && styles.expiredText,
-                                ]}>
-                                    {slot}
-                                </Text>
-                            </View>
-                        ))}
+                {/* Budget Section */}
+                <View style={styles.budgetSection}>
+                    <Text style={styles.budgetLabel}>BUDGET</Text>
+                    <View style={styles.budgetRow}>
+                        <Text style={styles.budgetCurrency}>KSh</Text>
+                        <Text style={[styles.budgetAmount, isExpired && styles.expiredText]}>
+                            {formatBudget(lead.budget)}
+                        </Text>
+                        <Text style={styles.budgetPeriod}>/mo</Text>
                     </View>
-                    <Text style={[styles.slotsCount, expired && styles.expiredText]}>
-                        {unlocked}/3
-                    </Text>
-                    <Text style={[styles.slotsStatus, { color: expired ? COLORS.expired : slotStatus.color }]}>
-                        {expired ? 'EXPIRED' : slotStatus.text}
-                    </Text>
                 </View>
 
                 {/* Divider */}
                 <View style={styles.divider} />
 
-                {/* Tenant Info */}
-                <View style={styles.tenantRow}>
-                    <View style={[styles.avatar, expired && styles.expiredAvatar]}>
-                        <Text style={[styles.avatarText, expired && styles.expiredText]}>
-                            {lead.tenant_name?.charAt(0).toUpperCase() || 'T'}
-                        </Text>
+                {/* Bottom Row - Stats & Manage */}
+                <View style={styles.cardBottomRow}>
+                    <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                            <Feather name="eye" size={14} color={COLORS.textSecondary} />
+                            <Text style={styles.statLabel}>VIEWS</Text>
+                            <Text style={styles.statValue}>{views}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Feather name="users" size={14} color={COLORS.textSecondary} />
+                            <Text style={styles.statLabel}>CONTACTS</Text>
+                            <Text style={styles.statValue}>{contacts}</Text>
+                        </View>
                     </View>
-                    <View style={styles.tenantInfo}>
-                        <Text style={[styles.tenantName, expired && styles.expiredText]}>
-                            {lead.tenant_name || 'Tenant'}
-                        </Text>
-                        <Text style={[styles.tenantStatus, expired && styles.expiredText]}>
-                            {lead.phone_verified ? 'Verified Renter' : 'Renter'}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Action Buttons */}
-                {expired ? (
-                    <TouchableOpacity style={styles.expiredButton} disabled>
-                        <Feather name="clock" size={16} color={COLORS.expired} />
-                        <Text style={styles.expiredButtonText}>Expired</Text>
+                    <TouchableOpacity
+                        style={styles.manageButton}
+                        onPress={() => toast.info('Lead details coming soon')}
+                    >
+                        <Text style={styles.manageText}>Manage</Text>
+                        <Feather name="chevron-right" size={16} color={COLORS.primary} />
                     </TouchableOpacity>
-                ) : (
-                    <>
-                        <TouchableOpacity
-                            style={styles.unlockButton}
-                            onPress={() => handleUnlock(lead)}
-                            activeOpacity={0.9}
-                        >
-                            <Feather name="zap" size={18} color="#FFFFFF" />
-                            <Text style={styles.unlockButtonText}>Unlock · 1000 Credits</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.exclusiveButton} activeOpacity={0.8}>
-                            <Feather name="award" size={16} color={COLORS.primary} />
-                            <Text style={styles.exclusiveButtonText}>Buy Exclusive Access</Text>
-                        </TouchableOpacity>
-                    </>
-                )}
+                </View>
             </View>
         );
     };
@@ -268,24 +201,18 @@ const AgentLeadsScreen = ({ navigation }) => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            {/* Header */}
+            {/* Header - Matching the mockup */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <View style={styles.logoContainer}>
-                        <Text style={styles.logoR}>R</Text>
-                    </View>
-                    <Text style={styles.logoText}>Yoombaa</Text>
+                    <Feather name="home" size={24} color={COLORS.primary} />
+                    <Text style={styles.logoText}>yoombaa</Text>
                 </View>
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.headerIcon}>
-                        <Feather name="grid" size={22} color={COLORS.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity style={styles.headerIconBtn}>
                         <Feather name="bell" size={22} color={COLORS.text} />
-                        <View style={styles.notificationDot} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.addButton}>
-                        <Feather name="plus" size={18} color="#FFFFFF" />
+                    <TouchableOpacity style={styles.avatarButton}>
+                        <Feather name="user" size={18} color={COLORS.primary} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -367,62 +294,49 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    // Header - Matching mockup exactly
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
         backgroundColor: COLORS.card,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    logoContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    logoR: {
-        fontSize: 18,
-        fontFamily: FONTS.bold,
-        color: '#FFFFFF',
-    },
     logoText: {
-        fontSize: 18,
+        fontSize: 20,
         fontFamily: FONTS.bold,
-        color: COLORS.text,
-        marginLeft: 8,
+        color: COLORS.primary,
+        marginLeft: 6,
     },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
     },
-    headerIcon: {
-        position: 'relative',
-    },
-    notificationDot: {
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: COLORS.error,
-    },
-    addButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: COLORS.primary,
+    headerIconBtn: {
+        width: 40,
+        height: 40,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    avatarButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.primary,
+    },
+    // Greeting
     greetingSection: {
         paddingHorizontal: 20,
         paddingVertical: 24,
@@ -438,6 +352,7 @@ const styles = StyleSheet.create({
         fontFamily: FONTS.bold,
         color: COLORS.text,
     },
+    // Dashboard Header
     dashboardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -471,6 +386,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
     },
+    // Search
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -512,7 +428,7 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginTop: 4,
     },
-    // Lead Card Styles - No shadow, only border
+    // Lead Card - Matching the mockup
     leadCard: {
         backgroundColor: COLORS.card,
         borderRadius: 16,
@@ -525,216 +441,119 @@ const styles = StyleSheet.create({
         backgroundColor: '#FAFAFA',
         opacity: 0.85,
     },
-    leadTopRow: {
+    cardTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 12,
     },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
+    },
+    statusText: {
+        fontSize: 11,
+        fontFamily: FONTS.bold,
+        letterSpacing: 0.5,
+    },
+    postedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    postedText: {
+        fontSize: 12,
+        fontFamily: FONTS.regular,
+        color: COLORS.textSecondary,
+    },
+    leadTitle: {
+        fontSize: 18,
+        fontFamily: FONTS.bold,
+        color: COLORS.text,
+        marginBottom: 8,
+    },
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 16,
+    },
+    locationText: {
+        fontSize: 14,
+        fontFamily: FONTS.regular,
+        color: COLORS.textSecondary,
+    },
+    budgetSection: {
+        marginBottom: 16,
+    },
+    budgetLabel: {
+        fontSize: 11,
+        fontFamily: FONTS.semiBold,
+        color: COLORS.textSecondary,
+        letterSpacing: 0.5,
+        marginBottom: 4,
+    },
+    budgetRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
+    budgetCurrency: {
+        fontSize: 14,
+        fontFamily: FONTS.medium,
+        color: COLORS.textSecondary,
+        marginRight: 4,
+    },
+    budgetAmount: {
+        fontSize: 28,
+        fontFamily: FONTS.bold,
+        color: COLORS.primary,
+    },
+    budgetPeriod: {
+        fontSize: 14,
+        fontFamily: FONTS.regular,
+        color: COLORS.textSecondary,
+        marginLeft: 2,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+        marginBottom: 12,
+    },
+    cardBottomRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
     statsRow: {
         flexDirection: 'row',
-        gap: 16,
+        gap: 20,
     },
     statItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
     },
-    statText: {
-        fontSize: 13,
-        fontFamily: FONTS.medium,
-        color: COLORS.textSecondary,
-    },
-    budgetBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.primaryLight,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-        gap: 4,
-    },
-    expiredBudgetBadge: {
-        backgroundColor: '#F3F4F6',
-    },
-    budgetText: {
-        fontSize: 13,
-        fontFamily: FONTS.bold,
-        color: COLORS.primary,
-    },
-    leadTitle: {
-        fontSize: 18,
+    statLabel: {
+        fontSize: 10,
         fontFamily: FONTS.semiBold,
-        color: COLORS.text,
-        marginBottom: 12,
-    },
-    tagsRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: 14,
-    },
-    tag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.background,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-        gap: 4,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    expiredTag: {
-        backgroundColor: '#F3F4F6',
-        borderColor: '#E5E7EB',
-    },
-    tagText: {
-        fontSize: 12,
-        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
+        letterSpacing: 0.3,
     },
-    slotsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 14,
-    },
-    slotsLabel: {
-        fontSize: 11,
-        fontFamily: FONTS.bold,
-        color: COLORS.textSecondary,
-        letterSpacing: 0.5,
-        marginRight: 10,
-    },
-    slotsBoxes: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    slotBox: {
-        width: 24,
-        height: 24,
-        borderRadius: 6,
-        backgroundColor: COLORS.background,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    slotBoxFilled: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
-    },
-    expiredSlotBox: {
-        backgroundColor: '#F3F4F6',
-        borderColor: '#E5E7EB',
-    },
-    slotNumber: {
-        fontSize: 11,
-        fontFamily: FONTS.bold,
-        color: COLORS.textSecondary,
-    },
-    slotNumberFilled: {
-        color: '#FFFFFF',
-    },
-    slotsCount: {
-        fontSize: 13,
-        fontFamily: FONTS.medium,
-        color: COLORS.textSecondary,
-        marginLeft: 10,
-        marginRight: 8,
-    },
-    slotsStatus: {
-        fontSize: 11,
-        fontFamily: FONTS.bold,
-        letterSpacing: 0.5,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: COLORS.border,
-        marginBottom: 14,
-    },
-    tenantRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 14,
-    },
-    avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.primaryLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    expiredAvatar: {
-        backgroundColor: '#F3F4F6',
-    },
-    avatarText: {
-        fontSize: 16,
-        fontFamily: FONTS.bold,
-        color: COLORS.primary,
-    },
-    tenantInfo: {
-        marginLeft: 12,
-    },
-    tenantName: {
-        fontSize: 15,
-        fontFamily: FONTS.semiBold,
-        color: COLORS.text,
-    },
-    tenantStatus: {
-        fontSize: 12,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
-    },
-    unlockButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: COLORS.primary,
-        paddingVertical: 14,
-        borderRadius: 12,
-        gap: 8,
-        marginBottom: 10,
-    },
-    unlockButtonText: {
-        fontSize: 15,
-        fontFamily: FONTS.semiBold,
-        color: '#FFFFFF',
-    },
-    exclusiveButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: COLORS.card,
-        paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        gap: 8,
-    },
-    exclusiveButtonText: {
+    statValue: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
-    expiredButton: {
+    manageButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F3F4F6',
-        paddingVertical: 14,
-        borderRadius: 12,
-        gap: 8,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        gap: 2,
     },
-    expiredButtonText: {
-        fontSize: 15,
-        fontFamily: FONTS.medium,
-        color: COLORS.expired,
+    manageText: {
+        fontSize: 14,
+        fontFamily: FONTS.semiBold,
+        color: COLORS.primary,
     },
     expiredText: {
         color: COLORS.expired,
