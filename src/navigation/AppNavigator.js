@@ -49,7 +49,7 @@ const COLORS = {
   dark: '#1F2937',
 };
 
-// Agent Tab Bar Component
+// Agent Tab Bar Component - Modern Pill Style
 const AgentTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
 
@@ -66,15 +66,15 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
         break;
       case 'AgentWallet':
         iconName = 'credit-card';
-        label = 'Wallet';
+        label = 'Assets';
         break;
       case 'AgentProperties':
         iconName = 'home';
         label = 'Properties';
         break;
       case 'AgentAccount':
-        iconName = 'user';
-        label = 'Profile';
+        iconName = 'settings';
+        label = 'Settings';
         break;
       default:
         iconName = 'circle';
@@ -100,19 +100,16 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
         onPress={onPress}
         activeOpacity={0.7}
       >
-        <Feather
-          name={iconName}
-          size={22}
-          color={isFocused ? COLORS.primary : COLORS.inactive}
-        />
-        <Text
-          style={[
-            styles.agentTabLabel,
-            { color: isFocused ? COLORS.primary : COLORS.inactive },
-          ]}
-        >
-          {label}
-        </Text>
+        {isFocused ? (
+          <View style={styles.agentActivePill}>
+            <Feather name={iconName} size={18} color={COLORS.primary} />
+            <Text style={styles.agentActiveLabel}>{label}</Text>
+          </View>
+        ) : (
+          <View style={styles.agentInactiveTab}>
+            <Feather name={iconName} size={22} color={COLORS.inactive} />
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -426,24 +423,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Agent Tab Bar Styles
+  // Agent Tab Bar Styles - Modern Pill Style
   agentTabBarWrapper: {
     backgroundColor: COLORS.background,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   agentTabBarContainer: {
     flexDirection: 'row',
-    height: 65,
+    height: 56,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.background,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 8,
   },
   agentTabItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    minWidth: 60,
+  },
+  agentActivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  agentActiveLabel: {
+    fontSize: 12,
+    fontFamily: FONTS.semiBold,
+    color: COLORS.primary,
+  },
+  agentInactiveTab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
   },
   agentTabLabel: {
     fontSize: 11,
