@@ -20,7 +20,24 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FE9200"
       },
-      "package": "com.yoombaa.rentconnect"
+      "package": "com.yoombaa.rentconnect",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "rentconnect",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

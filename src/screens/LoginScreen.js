@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,15 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../lib/supabase';
+import { FONTS } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,33 +31,67 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
 
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+  // Handle deep link for OAuth callback
+  useEffect(() => {
+    const handleDeepLink = async (event) => {
+      const url = event.url;
+      if (url && url.includes('access_token')) {
+        try {
+          // Parse the URL to extract tokens
+          const hashPart = url.split('#')[1];
+          if (hashPart) {
+            const params = new URLSearchParams(hashPart);
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+
+            if (accessToken && refreshToken) {
+              const { error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+              if (error) {
+                console.error('Error setting session:', error);
+                Alert.alert('Error', 'Failed to complete sign in');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Deep link error:', error);
+        }
+      }
+    };
+
+    // Listen for deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const handleLogin = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
-    if (!password) {
-      Alert.alert('Error', 'Please enter your password');
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password');
       return;
     }
 
     setLoading(true);
-    const result = await signIn(email, password);
-    setLoading(false);
-
-    if (!result.success) {
-      Alert.alert('Login Failed', result.error);
+    try {
+      const { error } = await signIn(email, password);
+      if (error) {
+        Alert.alert('Error', error.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,10 +99,13 @@ const LoginScreen = ({ navigation }) => {
     try {
       setGoogleLoading(true);
 
+      // Create the redirect URL for your app
       const redirectUrl = makeRedirectUri({
         scheme: 'rentconnect',
         path: 'auth/callback',
       });
+
+      console.log('Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -80,24 +118,41 @@ const LoginScreen = ({ navigation }) => {
       if (error) throw error;
 
       if (data?.url) {
+        // Open the OAuth URL in an in-app browser
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUrl
         );
 
-        if (result.type === 'success') {
-          const url = result.url;
-          // Extract tokens from URL and set session
-          const params = new URLSearchParams(url.split('#')[1]);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
+        console.log('Auth result:', result);
 
-          if (accessToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
+        if (result.type === 'success' && result.url) {
+          // Extract tokens from the callback URL
+          const url = result.url;
+
+          // Check if URL contains tokens in hash
+          if (url.includes('access_token')) {
+            const hashPart = url.split('#')[1];
+            if (hashPart) {
+              const params = new URLSearchParams(hashPart);
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+
+              if (accessToken && refreshToken) {
+                const { error: sessionError } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                });
+
+                if (sessionError) {
+                  throw sessionError;
+                }
+              }
+            }
           }
+        } else if (result.type === 'cancel') {
+          // User cancelled the sign-in
+          console.log('Sign in cancelled');
         }
       }
     } catch (error) {
@@ -119,31 +174,33 @@ const LoginScreen = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo */}
-          <View style={styles.logoSection}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/yoombaa logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.title}>Welcome back!</Text>
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Feather name="arrow-left" size={24} color="#1F2937" />
+          </TouchableOpacity>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            {/* Email Field */}
-            <View style={styles.inputGroup}>
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
               <Text style={styles.label}>Email</Text>
-              <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
                 <Feather name="mail" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="name@example.com"
-                  placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
+                  placeholder="Enter your email"
+                  placeholderTextColor="#9CA3AF"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -151,18 +208,19 @@ const LoginScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Password Field */}
-            <View style={styles.inputGroup}>
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
-              <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
                 <Feather name="lock" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor="#9CA3AF"
                   value={password}
                   onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#9CA3AF"
                   secureTextEntry={!showPassword}
+                  autoCapitalize="none"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -179,61 +237,53 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Forgot Password */}
             <TouchableOpacity
+              style={styles.forgotPassword}
               onPress={() => navigation.navigate('ForgotPassword')}
-              style={styles.forgotButton}
             >
-              <Text style={styles.forgotText}>Forgot Password?</Text>
+              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
 
             {/* Login Button */}
             <TouchableOpacity
-              style={[styles.loginButton, loading && styles.buttonDisabled]}
+              style={styles.loginButton}
               onPress={handleLogin}
-              disabled={loading || googleLoading}
-              activeOpacity={0.8}
+              disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <>
-                  <Text style={styles.loginButtonText}>Log In</Text>
-                  <Feather name="arrow-right" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
-                </>
+                <Text style={styles.loginButtonText}>Sign In</Text>
               )}
             </TouchableOpacity>
 
             {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>Or continue with</Text>
-              <View style={styles.divider} />
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with</Text>
+              <View style={styles.dividerLine} />
             </View>
 
             {/* Google Sign In */}
             <TouchableOpacity
               style={styles.googleButton}
               onPress={handleGoogleSignIn}
-              disabled={loading || googleLoading}
-              activeOpacity={0.8}
+              disabled={googleLoading}
             >
               {googleLoading ? (
                 <ActivityIndicator color="#1F2937" />
               ) : (
                 <>
-                  <Image
-                    source={{ uri: 'https://www.google.com/favicon.ico' }}
-                    style={styles.googleIcon}
-                  />
-                  <Text style={styles.googleButtonText}>Sign up with Google</Text>
+                  <Feather name="globe" size={20} color="#1F2937" />
+                  <Text style={styles.googleButtonText}>Continue with Google</Text>
                 </>
               )}
             </TouchableOpacity>
 
             {/* Sign Up Link */}
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Don't have an account? </Text>
+            <View style={styles.signUpContainer}>
+              <Text style={styles.signUpText}>Don't have an account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-                <Text style={styles.signupLink}>Sign Up</Text>
+                <Text style={styles.signUpLink}>Sign up</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -246,7 +296,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F5',
+    backgroundColor: '#FFFFFF',
   },
   keyboardView: {
     flex: 1,
@@ -256,137 +306,131 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
-  logoSection: {
-    alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 16,
-    backgroundColor: '#6B7B6B',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  logo: {
+  backButton: {
+    marginTop: 16,
+    marginBottom: 20,
     width: 40,
     height: 40,
-    tintColor: '#FFFFFF',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    marginBottom: 32,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontFamily: FONTS.bold,
     color: '#1F2937',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: FONTS.regular,
+    color: '#6B7280',
   },
   form: {
-    width: '100%',
+    flex: 1,
   },
-  inputGroup: {
+  inputContainer: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: FONTS.medium,
+    color: '#374151',
     marginBottom: 8,
   },
-  inputContainer: {
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    height: 56,
+    paddingHorizontal: 14,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   input: {
     flex: 1,
+    paddingVertical: 14,
     fontSize: 16,
+    fontFamily: FONTS.regular,
     color: '#1F2937',
   },
   eyeButton: {
     padding: 4,
   },
-  forgotButton: {
+  forgotPassword: {
     alignSelf: 'flex-end',
     marginBottom: 24,
   },
-  forgotText: {
+  forgotPasswordText: {
     fontSize: 14,
+    fontFamily: FONTS.medium,
     color: '#FE9200',
-    fontWeight: '600',
   },
   loginButton: {
-    flexDirection: 'row',
     backgroundColor: '#FE9200',
     borderRadius: 12,
-    height: 56,
+    paddingVertical: 16,
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 24,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
   loginButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
+    color: '#FFFFFF',
   },
-  dividerContainer: {
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
   },
-  divider: {
+  dividerLine: {
     flex: 1,
     height: 1,
     backgroundColor: '#E5E7EB',
   },
   dividerText: {
     marginHorizontal: 16,
-    color: '#9CA3AF',
     fontSize: 14,
+    fontFamily: FONTS.regular,
+    color: '#9CA3AF',
   },
   googleButton: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 32,
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 12,
+    paddingVertical: 14,
+    marginBottom: 24,
+    gap: 10,
   },
   googleButtonText: {
-    color: '#1F2937',
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: FONTS.medium,
+    color: '#1F2937',
   },
-  signupContainer: {
+  signUpContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  signupText: {
+  signUpText: {
+    fontSize: 14,
+    fontFamily: FONTS.regular,
     color: '#6B7280',
-    fontSize: 15,
   },
-  signupLink: {
-    color: '#7C3AED',
-    fontSize: 15,
-    fontWeight: '600',
+  signUpLink: {
+    fontSize: 14,
+    fontFamily: FONTS.semiBold,
+    color: '#FE9200',
   },
 });
 
