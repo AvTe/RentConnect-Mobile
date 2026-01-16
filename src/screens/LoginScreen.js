@@ -15,11 +15,11 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { makeRedirectUri } from 'expo-auth-session';
-import { supabase } from '../lib/supabase';
+import * as AuthSession from 'expo-auth-session';
+import { supabase, SUPABASE_URL } from '../lib/supabase';
 import { FONTS } from '../constants/theme';
 
+// Ensure browser auth sessions complete properly
 WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = ({ navigation }) => {
@@ -31,50 +31,11 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
 
-  // Handle deep link for OAuth callback
-  useEffect(() => {
-    const handleDeepLink = async (event) => {
-      const url = event.url;
-      if (url && url.includes('access_token')) {
-        try {
-          // Parse the URL to extract tokens
-          const hashPart = url.split('#')[1];
-          if (hashPart) {
-            const params = new URLSearchParams(hashPart);
-            const accessToken = params.get('access_token');
-            const refreshToken = params.get('refresh_token');
-
-            if (accessToken && refreshToken) {
-              const { error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              if (error) {
-                console.error('Error setting session:', error);
-                Alert.alert('Error', 'Failed to complete sign in');
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Deep link error:', error);
-        }
-      }
-    };
-
-    // Listen for deep links
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check if app was opened via deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  // Create redirect URL that works with Expo Go
+  const redirectUrl = AuthSession.makeRedirectUri({
+    scheme: 'yoombaa',
+    path: 'auth/callback',
+  });
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -99,61 +60,88 @@ const LoginScreen = ({ navigation }) => {
     try {
       setGoogleLoading(true);
 
-      // Create the redirect URL for your app
-      const redirectUrl = makeRedirectUri({
-        scheme: 'yoombaa',
-        path: 'auth/callback',
-      });
-
+      console.log('Starting Google OAuth...');
       console.log('Redirect URL:', redirectUrl);
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
+      // Build the OAuth URL manually with the correct redirect
+      const provider = 'google';
+      const encodedRedirectUrl = encodeURIComponent(redirectUrl);
 
-      if (error) throw error;
+      // Construct Supabase OAuth URL with proper redirect
+      const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodedRedirectUrl}`;
 
-      if (data?.url) {
-        // Open the OAuth URL in an in-app browser
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl
-        );
+      console.log('Auth URL:', authUrl);
 
-        console.log('Auth result:', result);
-
-        if (result.type === 'success' && result.url) {
-          // Extract tokens from the callback URL
-          const url = result.url;
-
-          // Check if URL contains tokens in hash
-          if (url.includes('access_token')) {
-            const hashPart = url.split('#')[1];
-            if (hashPart) {
-              const params = new URLSearchParams(hashPart);
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-
-              if (accessToken && refreshToken) {
-                const { error: sessionError } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken,
-                });
-
-                if (sessionError) {
-                  throw sessionError;
-                }
-              }
-            }
-          }
-        } else if (result.type === 'cancel') {
-          // User cancelled the sign-in
-          console.log('Sign in cancelled');
+      // Open browser for authentication
+      const result = await WebBrowser.openAuthSessionAsync(
+        authUrl,
+        redirectUrl,
+        {
+          showInRecents: true,
+          preferEphemeralSession: false,
         }
+      );
+
+      console.log('Browser result type:', result.type);
+
+      if (result.type === 'success') {
+        const url = result.url;
+        console.log('Success URL:', url);
+
+        // Extract tokens from URL
+        let accessToken = null;
+        let refreshToken = null;
+
+        // Check hash fragment first (most common)
+        if (url.includes('#')) {
+          const hashFragment = url.split('#')[1];
+          const params = new URLSearchParams(hashFragment);
+          accessToken = params.get('access_token');
+          refreshToken = params.get('refresh_token');
+        }
+
+        // Check query parameters as fallback
+        if (!accessToken && url.includes('?')) {
+          const queryString = url.split('?')[1]?.split('#')[0];
+          if (queryString) {
+            const params = new URLSearchParams(queryString);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+          }
+        }
+
+        console.log('Access token found:', !!accessToken);
+        console.log('Refresh token found:', !!refreshToken);
+
+        if (accessToken && refreshToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error('Session error:', error);
+            Alert.alert('Error', 'Failed to complete sign in. Please try again.');
+          } else {
+            console.log('Session set successfully!', data?.user?.email);
+          }
+        } else {
+          // Check if we got an error in the URL
+          const errorDesc = url.includes('error_description')
+            ? decodeURIComponent(url.split('error_description=')[1]?.split('&')[0] || '')
+            : null;
+
+          if (errorDesc) {
+            Alert.alert('Error', errorDesc);
+          } else {
+            console.log('No tokens found in URL');
+            Alert.alert('Error', 'Authentication failed. Please try again.');
+          }
+        }
+      } else if (result.type === 'cancel') {
+        console.log('User cancelled sign in');
+      } else if (result.type === 'dismiss') {
+        console.log('Browser was dismissed');
       }
     } catch (error) {
       console.error('Google Sign In Error:', error);
