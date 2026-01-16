@@ -9,11 +9,11 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { FONTS } from '../constants/theme';
 import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
@@ -28,6 +28,7 @@ const GOOGLE_ANDROID_CLIENT_ID = '458457543968-17k4rn46bmko62lie4u8j7c2d3rcqr2t.
 
 const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ const LoginScreen = ({ navigation }) => {
       handleGoogleToken(response.authentication?.idToken || response.authentication?.accessToken);
     } else if (response?.type === 'error') {
       console.error('Google auth error:', response.error);
-      Alert.alert('Error', 'Failed to sign in with Google');
+      toast.error('Failed to sign in with Google');
       setGoogleLoading(false);
     } else if (response?.type === 'cancel' || response?.type === 'dismiss') {
       setGoogleLoading(false);
@@ -63,7 +64,7 @@ const LoginScreen = ({ navigation }) => {
     if (!token) {
       console.error('No token received');
       setGoogleLoading(false);
-      Alert.alert('Error', 'Failed to get authentication token');
+      toast.error('Failed to get authentication token');
       return;
     }
 
@@ -78,13 +79,14 @@ const LoginScreen = ({ navigation }) => {
 
       if (error) {
         console.error('Supabase error:', error);
-        Alert.alert('Error', error.message || 'Failed to sign in');
+        toast.error(error.message || 'Failed to sign in');
       } else {
         console.log('Signed in successfully:', data?.user?.email);
+        toast.success('Signed in successfully!');
       }
     } catch (error) {
       console.error('Error signing in:', error);
-      Alert.alert('Error', 'Failed to complete sign in');
+      toast.error('Failed to complete sign in');
     } finally {
       setGoogleLoading(false);
     }
@@ -92,7 +94,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+      toast.warning('Please enter both email and password');
       return;
     }
 
@@ -100,10 +102,12 @@ const LoginScreen = ({ navigation }) => {
     try {
       const { error } = await signIn(email, password);
       if (error) {
-        Alert.alert('Error', error.message);
+        toast.error(error.message);
+      } else {
+        toast.success('Login successful!');
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -111,11 +115,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleGoogleSignIn = async () => {
     if (isExpoGo) {
-      Alert.alert(
-        'Google Sign In',
-        'Google Sign In is available in the production app. For now, please use email/password login.\n\nTo test, you can create an account using the Sign Up option.',
-        [{ text: 'OK' }]
-      );
+      toast.info('Google Sign In is available in the production app. Please use email/password login.');
       return;
     }
 
@@ -123,7 +123,7 @@ const LoginScreen = ({ navigation }) => {
     setGoogleLoading(true);
     try {
       if (!request) {
-        Alert.alert('Please Wait', 'Google Sign In is initializing. Please try again.');
+        toast.warning('Google Sign In is initializing. Please try again.');
         setGoogleLoading(false);
         return;
       }

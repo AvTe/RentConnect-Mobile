@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,12 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -28,6 +28,7 @@ const GOOGLE_ANDROID_CLIENT_ID = '458457543968-17k4rn46bmko62lie4u8j7c2d3rcqr2t.
 
 const SignUpScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const toast = useToast();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -47,37 +48,37 @@ const SignUpScreen = ({ navigation }) => {
 
   const handleSignUp = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
+      toast.error('Please enter your full name');
       return;
     }
 
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      toast.error('Please enter your email address');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      toast.error('Please enter a valid email address');
       return;
     }
 
     if (!phone.trim()) {
-      Alert.alert('Error', 'Phone number is required for agents');
+      toast.error('Phone number is required for agents');
       return;
     }
 
     if (!password) {
-      Alert.alert('Error', 'Please enter a password');
+      toast.error('Please enter a password');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      toast.error('Password must be at least 6 characters');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
@@ -95,16 +96,13 @@ const SignUpScreen = ({ navigation }) => {
 
     if (result.success) {
       if (result.emailConfirmationRequired) {
-        Alert.alert(
-          'Verify Your Email',
-          'Please check your email inbox (and spam folder) to verify your account before signing in.',
-          [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-        );
+        toast.success('Please check your email to verify your account');
+        navigation.navigate('Login');
       } else {
-        Alert.alert('Success', 'Agent account created successfully!');
+        toast.success('Agent account created successfully!');
       }
     } else {
-      Alert.alert('Sign Up Failed', result.error);
+      toast.error(result.error || 'Sign up failed');
     }
   };
 
@@ -125,7 +123,7 @@ const SignUpScreen = ({ navigation }) => {
       handleGoogleToken(response.authentication?.idToken || response.authentication?.accessToken);
     } else if (response?.type === 'error') {
       console.error('Google auth error:', response.error);
-      Alert.alert('Error', 'Failed to sign up with Google');
+      toast.error('Failed to sign up with Google');
       setGoogleLoading(false);
     } else if (response?.type === 'cancel' || response?.type === 'dismiss') {
       setGoogleLoading(false);
@@ -135,7 +133,7 @@ const SignUpScreen = ({ navigation }) => {
   const handleGoogleToken = async (token) => {
     if (!token) {
       setGoogleLoading(false);
-      Alert.alert('Error', 'Failed to get authentication token');
+      toast.error('Failed to get authentication token');
       return;
     }
 
@@ -147,12 +145,13 @@ const SignUpScreen = ({ navigation }) => {
       });
 
       if (error) {
-        Alert.alert('Error', error.message || 'Failed to sign up');
+        toast.error(error.message || 'Failed to sign up');
       } else {
         console.log('Signed up successfully:', data?.user?.email);
+        toast.success('Signed up successfully!');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to complete sign up');
+      toast.error('Failed to complete sign up');
     } finally {
       setGoogleLoading(false);
     }
@@ -160,24 +159,20 @@ const SignUpScreen = ({ navigation }) => {
 
   const handleGoogleSignUp = async () => {
     if (isExpoGo) {
-      Alert.alert(
-        'Google Sign Up',
-        'Google Sign Up is available in the production app. For now, please use email/password sign up.',
-        [{ text: 'OK' }]
-      );
+      toast.info('Google Sign Up is available in the production app. Please use email/password sign up.');
       return;
     }
 
     setGoogleLoading(true);
     try {
       if (!request) {
-        Alert.alert('Please Wait', 'Google Sign Up is initializing. Please try again.');
+        toast.warning('Google Sign Up is initializing. Please try again.');
         setGoogleLoading(false);
         return;
       }
       await promptAsync();
     } catch (error) {
-      Alert.alert('Error', 'Failed to sign up with Google');
+      toast.error('Failed to sign up with Google');
       setGoogleLoading(false);
     }
   };
