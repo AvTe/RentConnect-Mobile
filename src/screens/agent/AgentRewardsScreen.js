@@ -6,7 +6,6 @@ import {
     ScrollView,
     TouchableOpacity,
     RefreshControl,
-    ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,7 +44,6 @@ const AgentRewardsScreen = ({ navigation }) => {
     });
 
     useEffect(() => {
-        // Fetch vouchers here
         setLoading(false);
     }, []);
 
@@ -54,10 +52,10 @@ const AgentRewardsScreen = ({ navigation }) => {
         setTimeout(() => setRefreshing(false), 1000);
     };
 
-    const StatCard = ({ icon, iconBg, value, label }) => (
+    const StatCard = ({ icon, iconBg, iconColor, value, label }) => (
         <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: iconBg }]}>
-                <Feather name={icon} size={18} color={COLORS.card} />
+                <Feather name={icon} size={18} color={iconColor} />
             </View>
             <Text style={styles.statValue}>{value}</Text>
             <Text style={styles.statLabel}>{label}</Text>
@@ -128,18 +126,21 @@ const AgentRewardsScreen = ({ navigation }) => {
                     <StatCard
                         icon="gift"
                         iconBg={COLORS.primary}
+                        iconColor="#FFFFFF"
                         value={stats.total}
                         label="TOTAL VOUCHERS"
                     />
                     <StatCard
                         icon="check-circle"
                         iconBg={COLORS.success}
+                        iconColor="#FFFFFF"
                         value={stats.active}
                         label="ACTIVE"
                     />
                     <StatCard
                         icon="clock"
                         iconBg={COLORS.textSecondary}
+                        iconColor="#FFFFFF"
                         value={stats.used}
                         label="USED"
                     />
@@ -176,7 +177,6 @@ const AgentRewardsScreen = ({ navigation }) => {
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    // Voucher list would go here
                     <View />
                 )}
 
@@ -276,6 +276,8 @@ const styles = StyleSheet.create({
         padding: 16,
         width: 140,
         alignItems: 'flex-start',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     statIcon: {
         width: 36,
@@ -328,6 +330,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card,
         borderRadius: 20,
         marginBottom: 20,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     emptyIcon: {
         width: 80,
@@ -367,6 +371,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card,
         borderRadius: 20,
         padding: 20,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     howItWorksHeader: {
         flexDirection: 'row',

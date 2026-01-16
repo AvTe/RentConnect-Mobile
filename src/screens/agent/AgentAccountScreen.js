@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Image,
     Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -56,7 +55,7 @@ const AgentAccountScreen = ({ navigation }) => {
         return name.charAt(0).toUpperCase();
     };
 
-    const isVerified = userData?.kyc_status === 'verified' || true; // Default to true for demo
+    const isVerified = userData?.kyc_status === 'verified' || true;
 
     const MenuItem = ({ icon, iconBg, iconColor, title, value, valueColor, onPress, isExternal }) => (
         <TouchableOpacity
@@ -249,6 +248,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card,
         borderRadius: 20,
         marginBottom: 20,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     avatarContainer: {
         position: 'relative',
@@ -341,6 +342,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         marginBottom: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     menuItem: {
         flexDirection: 'row',

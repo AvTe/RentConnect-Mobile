@@ -8,7 +8,6 @@ import {
     TextInput,
     RefreshControl,
     ActivityIndicator,
-    Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -151,7 +150,7 @@ const AgentLeadsScreen = ({ navigation }) => {
                         </View>
                     </View>
                     <View style={[styles.budgetBadge, expired && styles.expiredBudgetBadge]}>
-                        <Text style={[styles.budgetIcon, expired && styles.expiredText]}>💰</Text>
+                        <Feather name="dollar-sign" size={12} color={expired ? COLORS.expired : COLORS.primary} />
                         <Text style={[styles.budgetText, expired && styles.expiredText]}>
                             {formatBudget(lead.budget)}
                         </Text>
@@ -227,7 +226,7 @@ const AgentLeadsScreen = ({ navigation }) => {
                             {lead.tenant_name || 'Tenant'}
                         </Text>
                         <Text style={[styles.tenantStatus, expired && styles.expiredText]}>
-                            {lead.phone_verified ? '✓ Verified Renter' : 'Renter'}
+                            {lead.phone_verified ? 'Verified Renter' : 'Renter'}
                         </Text>
                     </View>
                 </View>
@@ -250,7 +249,7 @@ const AgentLeadsScreen = ({ navigation }) => {
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.exclusiveButton} activeOpacity={0.8}>
-                            <Text style={styles.exclusiveIcon}>💎</Text>
+                            <Feather name="award" size={16} color={COLORS.primary} />
                             <Text style={styles.exclusiveButtonText}>Buy Exclusive Access</Text>
                         </TouchableOpacity>
                     </>
@@ -469,6 +468,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.background,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     searchContainer: {
         flexDirection: 'row',
@@ -511,21 +512,18 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginTop: 4,
     },
-    // Lead Card Styles
+    // Lead Card Styles - No shadow, only border
     leadCard: {
         backgroundColor: COLORS.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     expiredCard: {
-        backgroundColor: '#F9FAFB',
-        opacity: 0.8,
+        backgroundColor: '#FAFAFA',
+        opacity: 0.85,
     },
     leadTopRow: {
         flexDirection: 'row',
@@ -559,9 +557,6 @@ const styles = StyleSheet.create({
     expiredBudgetBadge: {
         backgroundColor: '#F3F4F6',
     },
-    budgetIcon: {
-        fontSize: 12,
-    },
     budgetText: {
         fontSize: 13,
         fontFamily: FONTS.bold,
@@ -587,9 +582,12 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 8,
         gap: 4,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     expiredTag: {
         backgroundColor: '#F3F4F6',
+        borderColor: '#E5E7EB',
     },
     tagText: {
         fontSize: 12,
@@ -667,6 +665,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     expiredAvatar: {
         backgroundColor: '#F3F4F6',
@@ -715,9 +715,6 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
         gap: 8,
     },
-    exclusiveIcon: {
-        fontSize: 14,
-    },
     exclusiveButtonText: {
         fontSize: 14,
         fontFamily: FONTS.medium,
@@ -731,6 +728,8 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 12,
         gap: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     expiredButtonText: {
         fontSize: 15,

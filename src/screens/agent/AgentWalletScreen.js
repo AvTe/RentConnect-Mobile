@@ -327,6 +327,8 @@ const styles = StyleSheet.create({
         padding: 28,
         alignItems: 'center',
         marginBottom: 24,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     balanceLabel: {
         fontSize: 12,
@@ -377,9 +379,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     actionIconPrimary: {
         backgroundColor: COLORS.primaryLight,
+        borderColor: COLORS.primary,
     },
     actionLabel: {
         fontSize: 13,
@@ -406,6 +411,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card,
         borderRadius: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     transactionItem: {
         flexDirection: 'row',

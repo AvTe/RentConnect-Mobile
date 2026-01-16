@@ -273,6 +273,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 16,
         marginBottom: 24,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     profileAvatar: {
         width: 56,
@@ -316,6 +318,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         marginBottom: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     settingItem: {
         flexDirection: 'row',
@@ -362,6 +366,8 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         alignItems: 'center',
         marginTop: 8,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
     },
     signOutText: {
         fontSize: 16,

@@ -49,7 +49,6 @@ const AgentPropertiesScreen = ({ navigation }) => {
         if (!user?.id) return;
 
         try {
-            // Fetch leads unlocked by this agent
             const { data, error, count } = await supabase
                 .from('agent_leads')
                 .select(`
@@ -65,7 +64,7 @@ const AgentPropertiesScreen = ({ navigation }) => {
             setTotalCount(count || 0);
         } catch (error) {
             console.error('Error fetching connected leads:', error);
-            // Use demo data for now
+            // Use demo data
             setConnectedLeads([
                 {
                     id: 1,
@@ -469,6 +468,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     leadHeader: {
         flexDirection: 'row',
@@ -481,6 +482,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     avatarText: {
         fontSize: 16,
@@ -575,6 +578,8 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     messageButton: {
         backgroundColor: '#E7F8EF',
@@ -587,6 +592,8 @@ const styles = StyleSheet.create({
         padding: 16,
         marginTop: 8,
         gap: 10,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     upsellText: {
         flex: 1,
