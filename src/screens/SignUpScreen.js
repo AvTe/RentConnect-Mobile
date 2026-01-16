@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,15 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import Constants from 'expo-constants';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { supabase } from '../lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth Client IDs
+const GOOGLE_WEB_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = '458457543968-17k4rn46bmko62lie4u8j7c2d3rcqr2t.apps.googleusercontent.com';
 
 const SignUpScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -102,6 +111,52 @@ const SignUpScreen = ({ navigation }) => {
   // Check if running in Expo Go
   const isExpoGo = Constants.appOwnership === 'expo';
 
+  // Google Auth configuration for production builds
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    expoClientId: GOOGLE_WEB_CLIENT_ID,
+  });
+
+  // Handle Google auth response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleGoogleToken(response.authentication?.idToken || response.authentication?.accessToken);
+    } else if (response?.type === 'error') {
+      console.error('Google auth error:', response.error);
+      Alert.alert('Error', 'Failed to sign up with Google');
+      setGoogleLoading(false);
+    } else if (response?.type === 'cancel' || response?.type === 'dismiss') {
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleToken = async (token) => {
+    if (!token) {
+      setGoogleLoading(false);
+      Alert.alert('Error', 'Failed to get authentication token');
+      return;
+    }
+
+    try {
+      console.log('Got Google token, signing in to Supabase...');
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: token,
+      });
+
+      if (error) {
+        Alert.alert('Error', error.message || 'Failed to sign up');
+      } else {
+        console.log('Signed up successfully:', data?.user?.email);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to complete sign up');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   const handleGoogleSignUp = async () => {
     if (isExpoGo) {
       Alert.alert(
@@ -112,13 +167,16 @@ const SignUpScreen = ({ navigation }) => {
       return;
     }
 
-    // This code will work in production builds
     setGoogleLoading(true);
     try {
-      Alert.alert('Info', 'Google Sign Up will be available in the production build');
+      if (!request) {
+        Alert.alert('Please Wait', 'Google Sign Up is initializing. Please try again.');
+        setGoogleLoading(false);
+        return;
+      }
+      await promptAsync();
     } catch (error) {
       Alert.alert('Error', 'Failed to sign up with Google');
-    } finally {
       setGoogleLoading(false);
     }
   };
