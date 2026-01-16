@@ -14,6 +14,7 @@ import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import TenantLeadScreen from '../screens/TenantLeadScreen';
+import SplashScreen from '../screens/SplashScreen';
 
 // Tenant Screens
 import TenantDashboardScreen from '../screens/tenant/TenantDashboardScreen';
@@ -208,11 +209,7 @@ const AppNavigator = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FE9200" />
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   return (
