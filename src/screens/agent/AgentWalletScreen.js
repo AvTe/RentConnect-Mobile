@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getWalletBalance, getWalletTransactions } from '../../lib/database';
+import { getWalletBalance } from '../../lib/database';
+import { getWalletTransactions } from '../../lib/leadService';
 import { FONTS } from '../../constants/theme';
 
 const COLORS = {

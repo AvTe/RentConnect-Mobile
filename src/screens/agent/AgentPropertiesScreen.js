@@ -49,61 +49,33 @@ const AgentPropertiesScreen = ({ navigation }) => {
         if (!user?.id) return;
 
         try {
+            // Use contact_history table to get unlocked leads
             const { data, error, count } = await supabase
-                .from('agent_leads')
+                .from('contact_history')
                 .select(`
                     *,
                     leads (*)
                 `, { count: 'exact' })
                 .eq('agent_id', user.id)
+                .in('contact_type', ['unlock', 'exclusive'])
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            setConnectedLeads(data || []);
-            setTotalCount(count || 0);
+            // Transform data to match expected format
+            const transformedData = (data || []).map(item => ({
+                id: item.id,
+                status: item.status || 'pending',
+                contacted_at: item.created_at,
+                leads: item.leads,
+            }));
+
+            setConnectedLeads(transformedData);
+            setTotalCount(count || transformedData.length);
         } catch (error) {
             console.error('Error fetching connected leads:', error);
-            // Use demo data
-            setConnectedLeads([
-                {
-                    id: 1,
-                    status: 'converted',
-                    contacted_at: new Date().toISOString(),
-                    leads: {
-                        tenant_name: 'John Wanjiku',
-                        tenant_phone: '+254 712 345 678',
-                        property_type: '2 Bedroom',
-                        location: 'Kilimani',
-                        phone_verified: true,
-                    }
-                },
-                {
-                    id: 2,
-                    status: 'contacted',
-                    contacted_at: new Date(Date.now() - 172800000).toISOString(),
-                    leads: {
-                        tenant_name: 'Sarah Mwangi',
-                        tenant_phone: '+254 799 123 456',
-                        property_type: 'Studio',
-                        location: 'Westlands',
-                        phone_verified: false,
-                    }
-                },
-                {
-                    id: 3,
-                    status: 'pending',
-                    contacted_at: new Date(Date.now() - 86400000).toISOString(),
-                    leads: {
-                        tenant_name: 'Peter Omondi',
-                        tenant_phone: '+254 700 111 222',
-                        property_type: '1 Bedroom',
-                        location: 'South B',
-                        phone_verified: true,
-                    }
-                },
-            ]);
-            setTotalCount(3);
+            setConnectedLeads([]);
+            setTotalCount(0);
         } finally {
             setLoading(false);
             setRefreshing(false);
