@@ -22,7 +22,8 @@ import { FONTS } from '../constants/theme';
 // Ensure browser auth sessions complete properly
 WebBrowser.maybeCompleteAuthSession();
 
-// Google OAuth Client IDs - you'll need to add these
+// Google OAuth Client IDs
+// Using Web Client ID with Expo's auth proxy for Expo Go
 const GOOGLE_WEB_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
 
 const LoginScreen = ({ navigation }) => {
@@ -35,10 +36,13 @@ const LoginScreen = ({ navigation }) => {
   const { signIn } = useAuth();
 
   // Use Google Auth with Expo's proxy
+  // expoClientId uses the web client ID with Expo's auth.expo.io proxy
   const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: GOOGLE_WEB_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    // Use Expo's auth proxy for Expo Go
-    // This handles the redirect properly
+    // For standalone builds, you'd also add:
+    // androidClientId: 'YOUR_ANDROID_CLIENT_ID',
+    // iosClientId: 'YOUR_IOS_CLIENT_ID',
   });
 
   // Handle Google auth response
