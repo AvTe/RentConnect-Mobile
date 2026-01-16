@@ -14,15 +14,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import { supabase } from '../lib/supabase';
 import { FONTS } from '../constants/theme';
-
-WebBrowser.maybeCompleteAuthSession();
-
-// Google OAuth configuration
-const GOOGLE_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
+import Constants from 'expo-constants';
 
 const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -32,6 +25,9 @@ const LoginScreen = ({ navigation }) => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
+
+  // Check if running in Expo Go
+  const isExpoGo = Constants.appOwnership === 'expo';
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -53,71 +49,21 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleGoogleSignIn = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        'Google Sign In',
+        'Google Sign In is available in the production app. For now, please use email/password login.\n\nTo test, you can create an account using the Sign Up option.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // This code will work in production builds
+    setGoogleLoading(true);
     try {
-      setGoogleLoading(true);
-
-      // Get the redirect URI for Expo
-      const redirectUri = AuthSession.makeRedirectUri({
-        useProxy: true,
-      });
-
-      console.log('Redirect URI:', redirectUri);
-
-      // Discovery document for Google OAuth
-      const discovery = {
-        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenEndpoint: 'https://oauth2.googleapis.com/token',
-      };
-
-      // Create auth request
-      const authRequest = new AuthSession.AuthRequest({
-        clientId: GOOGLE_CLIENT_ID,
-        scopes: ['openid', 'profile', 'email'],
-        redirectUri,
-        responseType: AuthSession.ResponseType.Token,
-        usePKCE: false,
-      });
-
-      // Prompt for authentication
-      const result = await authRequest.promptAsync(discovery, {
-        useProxy: true,
-      });
-
-      console.log('Auth result type:', result.type);
-
-      if (result.type === 'success') {
-        const { access_token, id_token } = result.params;
-
-        console.log('Got tokens from Google');
-
-        if (id_token) {
-          // Use ID token to sign in to Supabase
-          console.log('Signing in to Supabase with ID token...');
-
-          const { data, error } = await supabase.auth.signInWithIdToken({
-            provider: 'google',
-            token: id_token,
-          });
-
-          if (error) {
-            console.error('Supabase error:', error);
-            Alert.alert('Error', error.message || 'Failed to sign in');
-          } else {
-            console.log('Signed in successfully:', data?.user?.email);
-          }
-        } else if (access_token) {
-          // Fallback: try with access token
-          console.log('No ID token, trying access token...');
-          Alert.alert('Error', 'Could not get ID token from Google');
-        }
-      } else if (result.type === 'cancel') {
-        console.log('User cancelled');
-      } else if (result.type === 'error') {
-        console.error('Auth error:', result.error);
-        Alert.alert('Error', result.error?.message || 'Authentication failed');
-      }
+      // Production Google OAuth code would go here
+      Alert.alert('Info', 'Google Sign In will be available in the production build');
     } catch (error) {
-      console.error('Google Sign In Error:', error);
       Alert.alert('Error', 'Failed to sign in with Google');
     } finally {
       setGoogleLoading(false);
@@ -226,7 +172,7 @@ const LoginScreen = ({ navigation }) => {
 
             {/* Google Sign In */}
             <TouchableOpacity
-              style={styles.googleButton}
+              style={[styles.googleButton, isExpoGo && styles.googleButtonDisabled]}
               onPress={handleGoogleSignIn}
               disabled={googleLoading}
             >
@@ -234,8 +180,13 @@ const LoginScreen = ({ navigation }) => {
                 <ActivityIndicator color="#1F2937" />
               ) : (
                 <>
-                  <Feather name="globe" size={20} color="#1F2937" />
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  <Feather name="globe" size={20} color={isExpoGo ? "#9CA3AF" : "#1F2937"} />
+                  <Text style={[styles.googleButtonText, isExpoGo && styles.googleButtonTextDisabled]}>
+                    Continue with Google
+                  </Text>
+                  {isExpoGo && (
+                    <Text style={styles.devBadge}>Dev</Text>
+                  )}
                 </>
               )}
             </TouchableOpacity>
@@ -374,10 +325,27 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 10,
   },
+  googleButtonDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
   googleButtonText: {
     fontSize: 16,
     fontFamily: FONTS.medium,
     color: '#1F2937',
+  },
+  googleButtonTextDisabled: {
+    color: '#9CA3AF',
+  },
+  devBadge: {
+    fontSize: 10,
+    fontFamily: FONTS.medium,
+    color: '#FFFFFF',
+    backgroundColor: '#FE9200',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 4,
   },
   signUpContainer: {
     flexDirection: 'row',
