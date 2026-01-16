@@ -15,12 +15,15 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import { supabase, SUPABASE_URL } from '../lib/supabase';
+import * as Google from 'expo-auth-session/providers/google';
+import { supabase } from '../lib/supabase';
 import { FONTS } from '../constants/theme';
 
 // Ensure browser auth sessions complete properly
 WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth Client IDs - you'll need to add these
+const GOOGLE_WEB_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
 
 const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -31,11 +34,71 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useAuth();
 
-  // Create redirect URL that works with Expo Go
-  const redirectUrl = AuthSession.makeRedirectUri({
-    scheme: 'yoombaa',
-    path: 'auth/callback',
+  // Use Google Auth with Expo's proxy
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    // Use Expo's auth proxy for Expo Go
+    // This handles the redirect properly
   });
+
+  // Handle Google auth response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      handleGoogleToken(authentication?.accessToken);
+    } else if (response?.type === 'error') {
+      console.error('Google auth error:', response.error);
+      Alert.alert('Error', 'Failed to sign in with Google');
+      setGoogleLoading(false);
+    } else if (response?.type === 'cancel' || response?.type === 'dismiss') {
+      console.log('Google auth cancelled');
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleToken = async (accessToken) => {
+    if (!accessToken) {
+      console.error('No access token received');
+      setGoogleLoading(false);
+      return;
+    }
+
+    try {
+      console.log('Got Google access token, signing in to Supabase...');
+
+      // Use the Google access token to sign in to Supabase
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: accessToken,
+      });
+
+      if (error) {
+        console.error('Supabase sign in error:', error);
+
+        // Fallback: Try with OAuth method
+        console.log('Trying OAuth method...');
+        const { error: oauthError } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            queryParams: {
+              access_token: accessToken,
+            },
+          },
+        });
+
+        if (oauthError) {
+          throw oauthError;
+        }
+      } else {
+        console.log('Signed in successfully:', data?.user?.email);
+      }
+    } catch (error) {
+      console.error('Error signing in:', error);
+      Alert.alert('Error', 'Failed to complete sign in');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -59,94 +122,19 @@ const LoginScreen = ({ navigation }) => {
   const handleGoogleSignIn = async () => {
     try {
       setGoogleLoading(true);
+      console.log('Starting Google OAuth with Expo Auth...');
 
-      console.log('Starting Google OAuth...');
-      console.log('Redirect URL:', redirectUrl);
-
-      // Build the OAuth URL manually with the correct redirect
-      const provider = 'google';
-      const encodedRedirectUrl = encodeURIComponent(redirectUrl);
-
-      // Construct Supabase OAuth URL with proper redirect
-      const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodedRedirectUrl}`;
-
-      console.log('Auth URL:', authUrl);
-
-      // Open browser for authentication
-      const result = await WebBrowser.openAuthSessionAsync(
-        authUrl,
-        redirectUrl,
-        {
-          showInRecents: true,
-          preferEphemeralSession: false,
-        }
-      );
-
-      console.log('Browser result type:', result.type);
-
-      if (result.type === 'success') {
-        const url = result.url;
-        console.log('Success URL:', url);
-
-        // Extract tokens from URL
-        let accessToken = null;
-        let refreshToken = null;
-
-        // Check hash fragment first (most common)
-        if (url.includes('#')) {
-          const hashFragment = url.split('#')[1];
-          const params = new URLSearchParams(hashFragment);
-          accessToken = params.get('access_token');
-          refreshToken = params.get('refresh_token');
-        }
-
-        // Check query parameters as fallback
-        if (!accessToken && url.includes('?')) {
-          const queryString = url.split('?')[1]?.split('#')[0];
-          if (queryString) {
-            const params = new URLSearchParams(queryString);
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
-          }
-        }
-
-        console.log('Access token found:', !!accessToken);
-        console.log('Refresh token found:', !!refreshToken);
-
-        if (accessToken && refreshToken) {
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-
-          if (error) {
-            console.error('Session error:', error);
-            Alert.alert('Error', 'Failed to complete sign in. Please try again.');
-          } else {
-            console.log('Session set successfully!', data?.user?.email);
-          }
-        } else {
-          // Check if we got an error in the URL
-          const errorDesc = url.includes('error_description')
-            ? decodeURIComponent(url.split('error_description=')[1]?.split('&')[0] || '')
-            : null;
-
-          if (errorDesc) {
-            Alert.alert('Error', errorDesc);
-          } else {
-            console.log('No tokens found in URL');
-            Alert.alert('Error', 'Authentication failed. Please try again.');
-          }
-        }
-      } else if (result.type === 'cancel') {
-        console.log('User cancelled sign in');
-      } else if (result.type === 'dismiss') {
-        console.log('Browser was dismissed');
+      if (!request) {
+        console.log('Auth request not ready, please wait...');
+        Alert.alert('Please Wait', 'Google Sign In is initializing. Please try again.');
+        setGoogleLoading(false);
+        return;
       }
+
+      await promptAsync();
     } catch (error) {
       console.error('Google Sign In Error:', error);
-      Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
-    } finally {
+      Alert.alert('Error', 'Failed to start Google sign in');
       setGoogleLoading(false);
     }
   };
@@ -255,7 +243,7 @@ const LoginScreen = ({ navigation }) => {
             <TouchableOpacity
               style={styles.googleButton}
               onPress={handleGoogleSignIn}
-              disabled={googleLoading}
+              disabled={googleLoading || !request}
             >
               {googleLoading ? (
                 <ActivityIndicator color="#1F2937" />
