@@ -1,24 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import YoombaaLogo from '../../assets/yoombaa logo svg.svg';
+import { FONTS, COLORS } from '../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
-const COLORS = {
-    primary: '#FE9200',
-    primaryDark: '#E58300',
-    primaryLight: '#FFF5E6',
-    background: '#FFFFFF',
-    text: '#1F2937',
-    textLight: '#6B7280',
-};
-
 const SplashScreen = () => {
-    // Only animate the loading spinner
     const rotateAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Continuous rotate animation for loader
         const rotateAnimation = Animated.loop(
             Animated.timing(rotateAnim, {
                 toValue: 1,
@@ -41,17 +31,13 @@ const SplashScreen = () => {
 
     return (
         <View style={styles.container}>
-            {/* Main content */}
             <View style={styles.content}>
-                {/* Static Logo */}
                 <View style={styles.logoContainer}>
                     <YoombaaLogo width={160} height={55} />
                 </View>
 
-                {/* Tagline */}
                 <Text style={styles.tagline}>Find Your Perfect Home</Text>
 
-                {/* Loading indicator */}
                 <View style={styles.loaderContainer}>
                     <View style={styles.loaderTrack}>
                         <Animated.View
@@ -66,7 +52,6 @@ const SplashScreen = () => {
                 </View>
             </View>
 
-            {/* Footer */}
             <View style={styles.footer}>
                 <Text style={styles.footerText}>Powered by Yoombaa</Text>
             </View>
@@ -77,7 +62,7 @@ const SplashScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: '#FFFFFF',
     },
     content: {
         flex: 1,
@@ -90,9 +75,9 @@ const styles = StyleSheet.create({
     },
     tagline: {
         fontSize: 14,
-        color: COLORS.textLight,
-        fontWeight: '400',
+        color: '#6B7280',
         marginTop: 8,
+        fontFamily: FONTS.regular,
     },
     loaderContainer: {
         marginTop: 50,
@@ -116,7 +101,7 @@ const styles = StyleSheet.create({
         width: 10,
         height: 10,
         borderRadius: 5,
-        backgroundColor: COLORS.primary,
+        backgroundColor: '#FE9200',
         position: 'absolute',
         top: -2,
         left: 13,
@@ -128,6 +113,7 @@ const styles = StyleSheet.create({
     footerText: {
         fontSize: 12,
         color: '#D1D5DB',
+        fontFamily: FONTS.regular,
     },
 });
 

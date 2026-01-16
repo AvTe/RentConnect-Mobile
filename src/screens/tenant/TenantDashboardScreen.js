@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import YoombaaLogo from '../../../assets/yoombaa logo svg.svg';
+import { FONTS } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 

@@ -7,6 +7,7 @@ import { ActivityIndicator, View, StyleSheet, Text, TouchableOpacity, Animated }
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FONTS } from '../constants/theme';
 
 // Auth Screens
 import LandingScreen from '../screens/LandingScreen';
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
   },
   activeLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: COLORS.primary,
   },
   // Inactive Tab
