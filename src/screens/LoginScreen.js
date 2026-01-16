@@ -16,10 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { supabase, SUPABASE_URL } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { FONTS } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
 
 const LoginScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -53,85 +56,65 @@ const LoginScreen = ({ navigation }) => {
     try {
       setGoogleLoading(true);
 
-      // Create redirect URL using Expo's auth proxy
-      const redirectUrl = AuthSession.makeRedirectUri({
+      // Get the redirect URI for Expo
+      const redirectUri = AuthSession.makeRedirectUri({
         useProxy: true,
       });
 
-      console.log('Redirect URL:', redirectUrl);
+      console.log('Redirect URI:', redirectUri);
 
-      // Use Supabase OAuth with the proxy redirect
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
+      // Discovery document for Google OAuth
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+      };
+
+      // Create auth request
+      const authRequest = new AuthSession.AuthRequest({
+        clientId: GOOGLE_CLIENT_ID,
+        scopes: ['openid', 'profile', 'email'],
+        redirectUri,
+        responseType: AuthSession.ResponseType.Token,
+        usePKCE: false,
       });
 
-      if (error) throw error;
+      // Prompt for authentication
+      const result = await authRequest.promptAsync(discovery, {
+        useProxy: true,
+      });
 
-      if (data?.url) {
-        console.log('Opening auth URL...');
+      console.log('Auth result type:', result.type);
 
-        // Open browser with auth proxy
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl,
-          {
-            useProxy: true,
-            showInRecents: true,
-          }
-        );
+      if (result.type === 'success') {
+        const { access_token, id_token } = result.params;
 
-        console.log('Result type:', result.type);
+        console.log('Got tokens from Google');
 
-        if (result.type === 'success' && result.url) {
-          console.log('Success URL:', result.url);
+        if (id_token) {
+          // Use ID token to sign in to Supabase
+          console.log('Signing in to Supabase with ID token...');
 
-          // Extract tokens from URL
-          let accessToken = null;
-          let refreshToken = null;
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: id_token,
+          });
 
-          // Try hash fragment first
-          if (result.url.includes('#')) {
-            const hashPart = result.url.split('#')[1];
-            const params = new URLSearchParams(hashPart);
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
-          }
-
-          // Try query params as fallback
-          if (!accessToken && result.url.includes('?')) {
-            const queryPart = result.url.split('?')[1]?.split('#')[0];
-            if (queryPart) {
-              const params = new URLSearchParams(queryPart);
-              accessToken = params.get('access_token');
-              refreshToken = params.get('refresh_token');
-            }
-          }
-
-          console.log('Access token found:', !!accessToken);
-          console.log('Refresh token found:', !!refreshToken);
-
-          if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (sessionError) {
-              console.error('Session error:', sessionError);
-              Alert.alert('Error', 'Failed to complete sign in');
-            } else {
-              console.log('Session set successfully!');
-            }
+          if (error) {
+            console.error('Supabase error:', error);
+            Alert.alert('Error', error.message || 'Failed to sign in');
           } else {
-            Alert.alert('Error', 'Failed to get authentication tokens');
+            console.log('Signed in successfully:', data?.user?.email);
           }
-        } else if (result.type === 'cancel') {
-          console.log('User cancelled');
+        } else if (access_token) {
+          // Fallback: try with access token
+          console.log('No ID token, trying access token...');
+          Alert.alert('Error', 'Could not get ID token from Google');
         }
+      } else if (result.type === 'cancel') {
+        console.log('User cancelled');
+      } else if (result.type === 'error') {
+        console.error('Auth error:', result.error);
+        Alert.alert('Error', result.error?.message || 'Authentication failed');
       }
     } catch (error) {
       console.error('Google Sign In Error:', error);

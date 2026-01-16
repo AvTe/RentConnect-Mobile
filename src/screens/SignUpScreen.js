@@ -107,73 +107,63 @@ const SignUpScreen = ({ navigation }) => {
     try {
       setGoogleLoading(true);
 
-      // Create redirect URL using Expo's auth proxy
-      const redirectUrl = AuthSession.makeRedirectUri({
+      // Google OAuth configuration
+      const GOOGLE_CLIENT_ID = '458457543968-nea91cst4jt83u20ec4vo3jem4185gdg.apps.googleusercontent.com';
+
+      // Get the redirect URI for Expo
+      const redirectUri = AuthSession.makeRedirectUri({
         useProxy: true,
       });
 
-      console.log('Redirect URL:', redirectUrl);
+      console.log('Redirect URI:', redirectUri);
 
-      // Use Supabase OAuth with the proxy redirect
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
+      // Discovery document for Google OAuth
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+      };
+
+      // Create auth request
+      const authRequest = new AuthSession.AuthRequest({
+        clientId: GOOGLE_CLIENT_ID,
+        scopes: ['openid', 'profile', 'email'],
+        redirectUri,
+        responseType: AuthSession.ResponseType.Token,
+        usePKCE: false,
       });
 
-      if (error) throw error;
+      // Prompt for authentication
+      const result = await authRequest.promptAsync(discovery, {
+        useProxy: true,
+      });
 
-      if (data?.url) {
-        console.log('Opening auth URL...');
+      console.log('Auth result type:', result.type);
 
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl,
-          {
-            useProxy: true,
-            showInRecents: true,
-          }
-        );
+      if (result.type === 'success') {
+        const { id_token } = result.params;
 
-        console.log('Result type:', result.type);
+        if (id_token) {
+          console.log('Signing in to Supabase with ID token...');
 
-        if (result.type === 'success' && result.url) {
-          let accessToken = null;
-          let refreshToken = null;
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: id_token,
+          });
 
-          if (result.url.includes('#')) {
-            const hashPart = result.url.split('#')[1];
-            const params = new URLSearchParams(hashPart);
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
-          }
-
-          if (!accessToken && result.url.includes('?')) {
-            const queryPart = result.url.split('?')[1]?.split('#')[0];
-            if (queryPart) {
-              const params = new URLSearchParams(queryPart);
-              accessToken = params.get('access_token');
-              refreshToken = params.get('refresh_token');
-            }
-          }
-
-          if (accessToken && refreshToken) {
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (sessionError) {
-              Alert.alert('Error', 'Failed to complete sign up');
-            } else {
-              console.log('Signed up successfully!');
-            }
+          if (error) {
+            console.error('Supabase error:', error);
+            Alert.alert('Error', error.message || 'Failed to sign up');
           } else {
-            Alert.alert('Error', 'Failed to get authentication tokens');
+            console.log('Signed up successfully:', data?.user?.email);
           }
+        } else {
+          Alert.alert('Error', 'Could not get ID token from Google');
         }
+      } else if (result.type === 'cancel') {
+        console.log('User cancelled');
+      } else if (result.type === 'error') {
+        console.error('Auth error:', result.error);
+        Alert.alert('Error', result.error?.message || 'Authentication failed');
       }
     } catch (error) {
       console.error('Google Sign Up Error:', error);
