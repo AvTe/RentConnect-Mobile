@@ -45,6 +45,11 @@
     "scheme": "yoombaa",
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ba4a6761-e0c2-44d3-bff3-66575fdf9d0c"
+      }
+    }
   }
 }

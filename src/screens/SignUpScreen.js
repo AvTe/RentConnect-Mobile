@@ -116,6 +116,7 @@ const SignUpScreen = ({ navigation }) => {
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
     webClientId: GOOGLE_WEB_CLIENT_ID,
     expoClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
   });
 
   // Handle Google auth response
