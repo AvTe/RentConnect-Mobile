@@ -108,7 +108,7 @@ const SignUpScreen = ({ navigation }) => {
       setGoogleLoading(true);
 
       const redirectUrl = makeRedirectUri({
-        scheme: 'rentconnect',
+        scheme: 'yoombaa',
         path: 'auth/callback',
       });
 

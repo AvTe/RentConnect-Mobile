@@ -192,7 +192,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
-        { redirectTo: 'rentconnect://reset-password' }
+        { redirectTo: 'yoombaa://reset-password' }
       );
 
       if (error) {

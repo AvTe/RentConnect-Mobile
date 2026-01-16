@@ -101,7 +101,7 @@ const LoginScreen = ({ navigation }) => {
 
       // Create the redirect URL for your app
       const redirectUrl = makeRedirectUri({
-        scheme: 'rentconnect',
+        scheme: 'yoombaa',
         path: 'auth/callback',
       });
 

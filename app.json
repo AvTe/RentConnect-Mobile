@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "RentConnect",
-    "slug": "rentconnect-mobile",
+    "name": "Yoombaa",
+    "slug": "yoombaa-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,21 +13,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yoombaa.rentconnect"
+      "bundleIdentifier": "com.yoombaa.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FE9200"
       },
-      "package": "com.yoombaa.rentconnect",
+      "package": "com.yoombaa.app",
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
           "data": [
             {
-              "scheme": "rentconnect",
+              "scheme": "yoombaa",
               "host": "auth",
               "pathPrefix": "/callback"
             }
@@ -42,7 +42,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "rentconnect",
+    "scheme": "yoombaa",
     "plugins": [
       "expo-font"
     ]
