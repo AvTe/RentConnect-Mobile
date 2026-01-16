@@ -130,7 +130,7 @@ const LoginScreen = ({ navigation }) => {
       await promptAsync();
     } catch (error) {
       console.error('Google Sign In Error:', error);
-      Alert.alert('Error', 'Failed to sign in with Google');
+      toast.error('Failed to sign in with Google');
       setGoogleLoading(false);
     }
   };

@@ -7,12 +7,12 @@ import {
     TouchableOpacity,
     TextInput,
     Image,
-    Alert,
     ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
 
 const COLORS = {
@@ -28,6 +28,7 @@ const COLORS = {
 
 const ProfileScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
+    const toast = useToast();
     const { user, userProfile, refreshProfile } = useAuth();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -53,7 +54,7 @@ const ProfileScreen = ({ navigation }) => {
 
     const handleSave = async () => {
         if (!fullName.trim()) {
-            Alert.alert('Required', 'Please enter your name');
+            toast.warning('Please enter your name');
             return;
         }
 
@@ -73,11 +74,11 @@ const ProfileScreen = ({ navigation }) => {
             if (error) throw error;
 
             if (refreshProfile) await refreshProfile();
-            Alert.alert('Success', 'Profile updated successfully');
+            toast.success('Profile updated successfully');
             navigation.goBack();
         } catch (error) {
             console.error('Error saving profile:', error);
-            Alert.alert('Error', 'Failed to save profile. Please try again.');
+            toast.error('Failed to save profile. Please try again.');
         } finally {
             setSaving(false);
         }

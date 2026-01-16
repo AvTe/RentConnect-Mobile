@@ -10,7 +10,6 @@ import {
     Platform,
     Animated,
     Image,
-    Alert,
     ActivityIndicator,
     FlatList,
     Modal,
@@ -19,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import debounce from 'lodash.debounce';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../context/ToastContext';
 import {
     searchLocations,
     parseRequirementsWithAI,
@@ -35,6 +35,7 @@ const TOTAL_STEPS = 4;
 
 const TenantLeadScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
+    const toast = useToast();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -132,7 +133,7 @@ const TenantLeadScreen = ({ navigation }) => {
     // AI Quick Fill handler
     const handleAIQuickFill = async () => {
         if (aiInput.length < 10) {
-            Alert.alert('Too Short', 'Please describe your requirements in more detail');
+            toast.warning('Please describe your requirements in more detail');
             return;
         }
         setAiLoading(true);
@@ -148,12 +149,12 @@ const TenantLeadScreen = ({ navigation }) => {
                 }
                 if (result.data.budget) setBudget(result.data.budget.toString());
                 setShowAIPanel(false);
-                Alert.alert('Success', 'Form filled with your requirements!');
+                toast.success('Form filled with your requirements!');
             } else {
-                Alert.alert('Error', 'Could not parse your requirements. Try being more specific.');
+                toast.error('Could not parse your requirements. Try being more specific.');
             }
         } catch (error) {
-            Alert.alert('Error', 'Failed to process. Please try again.');
+            toast.error('Failed to process. Please try again.');
         } finally {
             setAiLoading(false);
         }
@@ -162,7 +163,7 @@ const TenantLeadScreen = ({ navigation }) => {
     // OTP handlers
     const handleSendOTP = async () => {
         if (!phone || phone.length < 9) {
-            Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+            toast.warning('Please enter a valid phone number');
             return;
         }
         const fullPhone = `+${countryCode === 'KE' ? '254' : '91'}${phone.replace(/\D/g, '')}`;
@@ -175,7 +176,7 @@ const TenantLeadScreen = ({ navigation }) => {
             setShowOTPModal(true);
         } else {
             setOtpStep('idle');
-            Alert.alert('Error', result.error || 'Failed to send OTP');
+            toast.error(result.error || 'Failed to send OTP');
         }
     };
 
@@ -187,7 +188,7 @@ const TenantLeadScreen = ({ navigation }) => {
         if (result.success && result.verified) {
             setOtpStep('verified');
             setShowOTPModal(false);
-            Alert.alert('Verified!', 'Your phone number has been verified');
+            toast.success('Your phone number has been verified');
         } else {
             setOtpError(result.error || 'Invalid code. Please try again.');
             setOtpStep('sent');
@@ -222,24 +223,24 @@ const TenantLeadScreen = ({ navigation }) => {
     const handleNext = () => {
         // Validation
         if (currentStep === 1 && !location.trim()) {
-            Alert.alert('Required', 'Please enter your preferred location');
+            toast.warning('Please enter your preferred location');
             return;
         }
         if (currentStep === 2 && !propertyType) {
-            Alert.alert('Required', 'Please select a property type');
+            toast.warning('Please select a property type');
             return;
         }
         if (currentStep === 3 && !budget && !selectedBudgetOption) {
-            Alert.alert('Required', 'Please set your budget');
+            toast.warning('Please set your budget');
             return;
         }
         if (currentStep === 4) {
             if (!name.trim()) {
-                Alert.alert('Required', 'Please enter your name');
+                toast.warning('Please enter your name');
                 return;
             }
             if (!email.trim()) {
-                Alert.alert('Required', 'Please enter your email');
+                toast.warning('Please enter your email');
                 return;
             }
             handleSubmit();
@@ -308,7 +309,7 @@ const TenantLeadScreen = ({ navigation }) => {
             setSubmitted(true);
         } catch (error) {
             console.error('Error submitting lead:', error);
-            Alert.alert('Error', 'Failed to submit your request. Please try again.');
+            toast.error('Failed to submit your request. Please try again.');
         } finally {
             setLoading(false);
         }

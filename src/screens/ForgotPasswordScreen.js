@@ -8,14 +8,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -28,12 +29,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      toast.warning('Please enter your email address');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      toast.warning('Please enter a valid email address');
       return;
     }
 
@@ -43,8 +44,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     if (result.success) {
       setSent(true);
+      toast.success('Password reset email sent!');
     } else {
-      Alert.alert('Error', result.error);
+      toast.error(result.error);
     }
   };
 

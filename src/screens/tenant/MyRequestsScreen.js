@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
 
 const COLORS = {
@@ -33,6 +34,7 @@ const STATUS_COLORS = {
 
 const MyRequestsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
+    const toast = useToast();
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -89,8 +91,9 @@ const MyRequestsScreen = ({ navigation }) => {
                 .update({ status: newStatus })
                 .eq('id', request.id);
             fetchRequests();
+            toast.success('Status updated successfully');
         } catch (error) {
-            Alert.alert('Error', 'Failed to update status');
+            toast.error('Failed to update status');
         }
     };
 
@@ -112,8 +115,9 @@ const MyRequestsScreen = ({ navigation }) => {
                 .delete()
                 .eq('id', request.id);
             fetchRequests();
+            toast.success('Request deleted successfully');
         } catch (error) {
-            Alert.alert('Error', 'Failed to delete request');
+            toast.error('Failed to delete request');
         }
     };
 
