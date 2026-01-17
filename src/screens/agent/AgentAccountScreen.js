@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,11 +6,13 @@ import {
     ScrollView,
     TouchableOpacity,
     Alert,
+    Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { getWalletBalance } from '../../lib/database';
 import { FONTS } from '../../constants/theme';
 
 const COLORS = {
@@ -30,8 +32,20 @@ const AgentAccountScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const { user, userData, signOut } = useAuth();
-    const [walletBalance] = useState(70);
+    const [walletBalance, setWalletBalance] = useState(0);
     const [plan] = useState('Free');
+
+    useEffect(() => {
+        const fetchBalance = async () => {
+            if (user?.id) {
+                const result = await getWalletBalance(user.id);
+                if (result.success) {
+                    setWalletBalance(result.balance);
+                }
+            }
+        };
+        fetchBalance();
+    }, [user?.id]);
 
     const handleSignOut = () => {
         Alert.alert(
@@ -138,7 +152,7 @@ const AgentAccountScreen = ({ navigation }) => {
                         iconBg="#DBEAFE"
                         iconColor="#3B82F6"
                         title="Personal Information"
-                        onPress={() => navigation.navigate('Profile')}
+                        onPress={() => navigation.navigate('AgentProfileEdit')}
                     />
                     <View style={styles.menuDivider} />
                     <MenuItem
@@ -146,7 +160,7 @@ const AgentAccountScreen = ({ navigation }) => {
                         iconBg="#FEF3C7"
                         iconColor="#F59E0B"
                         title="Agency Profile"
-                        onPress={() => toast.info('Agency Profile coming soon')}
+                        onPress={() => navigation.navigate('AgentProfileEdit')}
                     />
                     <View style={styles.menuDivider} />
                     <MenuItem
@@ -154,8 +168,8 @@ const AgentAccountScreen = ({ navigation }) => {
                         iconBg="#D1FAE5"
                         iconColor="#10B981"
                         title="Verification Status"
-                        value="Verified"
-                        valueColor={COLORS.success}
+                        value={isVerified ? "Verified" : "Pending"}
+                        valueColor={isVerified ? COLORS.success : COLORS.warning}
                         onPress={() => toast.info('Verification details coming soon')}
                     />
                 </View>
@@ -167,7 +181,7 @@ const AgentAccountScreen = ({ navigation }) => {
                         iconBg="#EDE9FE"
                         iconColor="#8B5CF6"
                         title="Notifications"
-                        onPress={() => toast.info('Notifications coming soon')}
+                        onPress={() => navigation.navigate('Notifications')}
                     />
                     <View style={styles.menuDivider} />
                     <MenuItem
@@ -175,7 +189,7 @@ const AgentAccountScreen = ({ navigation }) => {
                         iconBg="#F3F4F6"
                         iconColor="#6B7280"
                         title="Security"
-                        onPress={() => toast.info('Security coming soon')}
+                        onPress={() => navigation.navigate('AgentSettings')}
                     />
                 </View>
 

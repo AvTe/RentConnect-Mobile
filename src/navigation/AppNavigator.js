@@ -29,6 +29,12 @@ import AgentPropertiesScreen from '../screens/agent/AgentPropertiesScreen';
 import AgentAccountScreen from '../screens/agent/AgentAccountScreen';
 import AgentSettingsScreen from '../screens/agent/AgentSettingsScreen';
 import AgentRewardsScreen from '../screens/agent/AgentRewardsScreen';
+import AgentAssetsScreen from '../screens/agent/AgentAssetsScreen';
+import LeadDetailScreen from '../screens/agent/LeadDetailScreen';
+import BuyCreditsScreen from '../screens/agent/BuyCreditsScreen';
+import NotificationsScreen from '../screens/agent/NotificationsScreen';
+import AgentProfileEditScreen from '../screens/agent/AgentProfileEditScreen';
+import LeadFiltersScreen from '../screens/agent/LeadFiltersScreen';
 
 // Profile & Settings Screens
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -62,19 +68,23 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
     switch (route.name) {
       case 'AgentLeads':
         iconName = 'grid';
-        label = 'Leads';
-        break;
-      case 'AgentWallet':
-        iconName = 'credit-card';
-        label = 'Assets';
+        label = 'Dashboard';
         break;
       case 'AgentProperties':
         iconName = 'home';
         label = 'Properties';
         break;
+      case 'AgentAssets':
+        iconName = 'folder';
+        label = 'Assets';
+        break;
+      case 'AgentRewards':
+        iconName = 'gift';
+        label = 'Rewards';
+        break;
       case 'AgentAccount':
-        iconName = 'settings';
-        label = 'Settings';
+        iconName = 'user';
+        label = 'Account';
         break;
       default:
         iconName = 'circle';
@@ -273,8 +283,9 @@ const AgentTabNavigator = () => {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="AgentLeads" component={AgentLeadsScreen} />
-      <Tab.Screen name="AgentWallet" component={AgentWalletScreen} />
       <Tab.Screen name="AgentProperties" component={AgentPropertiesScreen} />
+      <Tab.Screen name="AgentAssets" component={AgentAssetsScreen} />
+      <Tab.Screen name="AgentRewards" component={AgentRewardsScreen} />
       <Tab.Screen name="AgentAccount" component={AgentAccountScreen} />
     </Tab.Navigator>
   );
@@ -318,6 +329,41 @@ const AgentMainStack = () => {
         name="AgentRewards"
         component={AgentRewardsScreen}
         options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentWallet"
+        component={AgentWalletScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentAssets"
+        component={AgentAssetsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="LeadDetail"
+        component={LeadDetailScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="BuyCredits"
+        component={BuyCreditsScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentProfileEdit"
+        component={AgentProfileEditScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="LeadFilters"
+        component={LeadFiltersScreen}
+        options={{ animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="Profile"

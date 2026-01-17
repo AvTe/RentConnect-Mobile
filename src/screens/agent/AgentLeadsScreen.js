@@ -210,7 +210,11 @@ const AgentLeadsScreen = ({ navigation }) => {
         const budget = lead.budget || lead.requirements?.budget || 0;
 
         return (
-            <View style={[styles.leadCard, (isExpired || isSoldOut) && styles.disabledCard]}>
+            <TouchableOpacity
+                style={[styles.leadCard, (isExpired || isSoldOut) && styles.disabledCard]}
+                onPress={() => navigation.navigate('LeadDetail', { leadId: lead.id })}
+                activeOpacity={0.95}
+            >
                 {/* Top Row - Stats & Budget */}
                 <View style={styles.topRow}>
                     <View style={styles.statsContainer}>
@@ -366,7 +370,7 @@ const AgentLeadsScreen = ({ navigation }) => {
                         </View>
                     )}
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -388,10 +392,16 @@ const AgentLeadsScreen = ({ navigation }) => {
                     <Text style={styles.logoText}>yoombaa</Text>
                 </View>
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.headerIconBtn}>
+                    <TouchableOpacity
+                        style={styles.headerIconBtn}
+                        onPress={() => navigation.navigate('Notifications')}
+                    >
                         <Feather name="bell" size={22} color={COLORS.text} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.avatarButton}>
+                    <TouchableOpacity
+                        style={styles.avatarButton}
+                        onPress={() => navigation.navigate('AgentProfileEdit')}
+                    >
                         <Feather name="user" size={18} color={COLORS.primary} />
                     </TouchableOpacity>
                 </View>
@@ -415,7 +425,10 @@ const AgentLeadsScreen = ({ navigation }) => {
                         <Text style={styles.filterHighlight}>(filtered from {totalLeads})</Text>
                     </Text>
                 </View>
-                <TouchableOpacity style={styles.filterButton}>
+                <TouchableOpacity
+                    style={styles.filterButton}
+                    onPress={() => navigation.navigate('LeadFilters')}
+                >
                     <Feather name="sliders" size={20} color={COLORS.text} />
                 </TouchableOpacity>
             </View>

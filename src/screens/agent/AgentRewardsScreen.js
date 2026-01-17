@@ -170,7 +170,7 @@ const AgentRewardsScreen = ({ navigation }) => {
                         </Text>
                         <TouchableOpacity
                             style={styles.premiumButton}
-                            onPress={() => toast.info('Premium plans coming soon')}
+                            onPress={() => navigation.navigate('BuyCredits')}
                             activeOpacity={0.9}
                         >
                             <Text style={styles.premiumButtonText}>View Premium Plans</Text>

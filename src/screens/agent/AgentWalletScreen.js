@@ -211,7 +211,7 @@ const AgentWalletScreen = ({ navigation }) => {
                         icon="plus"
                         label="Top Up"
                         isPrimary
-                        onPress={() => toast.info('Top Up coming soon')}
+                        onPress={() => navigation.navigate('BuyCredits')}
                     />
                     <ActionButton
                         icon="arrow-down"
