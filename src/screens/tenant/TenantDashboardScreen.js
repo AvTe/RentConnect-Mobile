@@ -19,7 +19,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import YoombaaLogo from '../../../assets/yoombaa logo svg.svg';
-import { FONTS } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -124,10 +123,16 @@ const TenantDashboardScreen = ({ navigation }) => {
 
     // Auto-scroll carousel
     useEffect(() => {
+        if (promoSlides.length === 0) return;
+
         const interval = setInterval(() => {
             setCurrentSlide((prev) => {
                 const nextSlide = (prev + 1) % promoSlides.length;
-                carouselRef.current?.scrollToIndex({ index: nextSlide, animated: true });
+                try {
+                    carouselRef.current?.scrollToIndex({ index: nextSlide, animated: true });
+                } catch (e) {
+                    // Silently handle scroll failures (e.g., layout not ready)
+                }
                 return nextSlide;
             });
         }, 4000);
@@ -240,6 +245,11 @@ const TenantDashboardScreen = ({ navigation }) => {
                             offset: BANNER_WIDTH * index,
                             index,
                         })}
+                        onScrollToIndexFailed={(info) => {
+                            setTimeout(() => {
+                                carouselRef.current?.scrollToIndex({ index: info.index, animated: true });
+                            }, 100);
+                        }}
                         renderItem={({ item }) => (
                             <View style={[styles.bannerSlide, { width: BANNER_WIDTH }]}>
                                 <ImageBackground
@@ -341,7 +351,7 @@ const TenantDashboardScreen = ({ navigation }) => {
                         <TouchableOpacity
                             key={request.id}
                             style={styles.requestCard}
-                            onPress={() => navigation.navigate('RequestDetail', { requestId: request.id })}
+                            onPress={() => navigation.navigate('Requests')}
                             activeOpacity={0.9}
                         >
                             {/* Card Header */}

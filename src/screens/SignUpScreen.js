@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { logger } from '../lib/logger';
 import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -138,7 +139,7 @@ const SignUpScreen = ({ navigation }) => {
     }
 
     try {
-      console.log('Got Google token, signing in to Supabase...');
+      logger.log('Got Google token, signing in to Supabase...');
       const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'google',
         token: token,
@@ -147,7 +148,7 @@ const SignUpScreen = ({ navigation }) => {
       if (error) {
         toast.error(error.message || 'Failed to sign up');
       } else {
-        console.log('Signed up successfully:', data?.user?.email);
+        logger.log('Signed up successfully:', data?.user?.email);
         toast.success('Signed up successfully!');
       }
     } catch (error) {
@@ -408,7 +409,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF5E6',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 30,
     alignSelf: 'flex-start',
     marginBottom: 16,
   },
@@ -449,7 +450,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 30,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     paddingHorizontal: 16,
@@ -474,7 +475,7 @@ const styles = StyleSheet.create({
   signupButton: {
     flexDirection: 'row',
     backgroundColor: '#FE9200',
-    borderRadius: 12,
+    borderRadius: 30,
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
@@ -507,7 +508,7 @@ const styles = StyleSheet.create({
   googleButton: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 30,
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',

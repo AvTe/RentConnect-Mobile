@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONTS } from '../constants/theme';
+
+// Inline font definition to avoid module loading issues
+const FONT_MEDIUM = 'DMSans_500Medium';
 
 const { width } = Dimensions.get('window');
 
@@ -184,13 +186,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderRadius: 12,
         shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
         shadowRadius: 8,
-        elevation: 8,
+        elevation: 4,
         maxWidth: width - 32,
     },
     toastContent: {
@@ -202,7 +201,7 @@ const styles = StyleSheet.create({
     toastMessage: {
         flex: 1,
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: FONT_MEDIUM,
         color: '#FFFFFF',
         lineHeight: 20,
     },
@@ -213,3 +212,4 @@ const styles = StyleSheet.create({
 });
 
 export default ToastContext;
+

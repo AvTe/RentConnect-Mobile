@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { logger } from './logger';
 
 // ============================================
 // USER OPERATIONS
@@ -126,12 +127,12 @@ export const createUser = async (userId, userData) => {
 
         if (error) throw error;
 
-        console.log('[CreateUser] User created successfully:', userId);
+        logger.log('[CreateUser] User created successfully:', userId);
 
         // Process referral if provided
         if (userData.referredBy || userData.referred_by) {
             const referralCode = userData.referredBy || userData.referred_by;
-            console.log('[CreateUser] Referral code provided:', referralCode);
+            logger.log('[CreateUser] Referral code provided:', referralCode);
             await processReferral(userId, referralCode);
         }
 
@@ -188,7 +189,7 @@ export const checkPhoneNumberExists = async (phoneNumber) => {
  * Process referral code - Awards credits on signup
  */
 export const processReferral = async (newUserId, referralCode) => {
-    console.log('[Referral] Processing referral:', { newUserId, referralCode });
+    logger.log('[Referral] Processing referral:', { newUserId, referralCode });
 
     try {
         if (!newUserId || !referralCode) {
@@ -205,7 +206,7 @@ export const processReferral = async (newUserId, referralCode) => {
             .maybeSingle();
 
         if (findError || !referrer) {
-            console.log('[Referral] No referrer found with code:', normalizedCode);
+            logger.log('[Referral] No referrer found with code:', normalizedCode);
             return { success: false, error: 'Invalid referral code' };
         }
 
@@ -267,7 +268,7 @@ export const processReferral = async (newUserId, referralCode) => {
             created_at: new Date().toISOString()
         });
 
-        console.log('[Referral] Successfully processed referral');
+        logger.log('[Referral] Successfully processed referral');
         return { success: true, referrerName: referrer.name };
     } catch (error) {
         console.error('[Referral] Error:', error);

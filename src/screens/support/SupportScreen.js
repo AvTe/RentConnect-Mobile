@@ -5,9 +5,16 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    Alert,
+    Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+
+// FIXME: Replace with actual Yoombaa support contact details before production release
+const SUPPORT_WHATSAPP = '254700000000'; // placeholder
+const SUPPORT_EMAIL = 'support@yoombaa.com';
+const SUPPORT_PHONE = '+254700000000'; // placeholder
 
 const COLORS = {
     primary: '#FE9200',
@@ -80,19 +87,19 @@ const SupportScreen = ({ navigation }) => {
 
                 {/* Contact Options */}
                 <View style={styles.optionsRow}>
-                    <TouchableOpacity style={styles.optionCard}>
+                    <TouchableOpacity style={styles.optionCard} onPress={() => Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}`).catch(() => Alert.alert('Error', 'Could not open WhatsApp'))}>
                         <View style={[styles.optionIcon, { backgroundColor: '#D1FAE5' }]}>
                             <Feather name="message-circle" size={22} color="#059669" />
                         </View>
                         <Text style={styles.optionText}>WhatsApp</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.optionCard}>
+                    <TouchableOpacity style={styles.optionCard} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => Alert.alert('Error', 'Could not open email client'))}>
                         <View style={[styles.optionIcon, { backgroundColor: '#DBEAFE' }]}>
                             <Feather name="mail" size={22} color="#2563EB" />
                         </View>
                         <Text style={styles.optionText}>Email Us</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.optionCard}>
+                    <TouchableOpacity style={styles.optionCard} onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => Alert.alert('Error', 'Could not open phone dialer'))}>
                         <View style={[styles.optionIcon, { backgroundColor: '#EDE9FE' }]}>
                             <Feather name="phone" size={22} color="#7C3AED" />
                         </View>
@@ -127,7 +134,7 @@ const SupportScreen = ({ navigation }) => {
                 {/* Create Ticket Button */}
                 <TouchableOpacity
                     style={styles.ticketBtn}
-                    onPress={() => navigation.navigate('CreateTicket')}
+                    onPress={() => Alert.alert('Coming Soon', 'Support ticket creation will be available in a future update.')}
                 >
                     <Feather name="plus" size={20} color="#FFFFFF" />
                     <Text style={styles.ticketBtnText}>Create Support Ticket</Text>
@@ -215,8 +222,8 @@ const styles = StyleSheet.create({
         marginHorizontal: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
         elevation: 2,
     },
     optionIcon: {
@@ -283,3 +290,4 @@ const styles = StyleSheet.create({
 });
 
 export default SupportScreen;
+

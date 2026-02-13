@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -208,7 +207,7 @@ const NotificationsScreen = ({ navigation }) => {
                 if (notification.lead_id) {
                     navigation.navigate('LeadDetail', { leadId: notification.lead_id });
                 } else {
-                    navigation.navigate('AgentLeads');
+                    navigation.navigate('AgentTabs', { screen: 'AgentLeads' });
                 }
                 break;
             case 'credit_added':
@@ -216,7 +215,7 @@ const NotificationsScreen = ({ navigation }) => {
                 navigation.navigate('AgentWallet');
                 break;
             case 'referral':
-                navigation.navigate('AgentRewards');
+                navigation.navigate('AgentTabs', { screen: 'AgentRewards' });
                 break;
             default:
                 break;
@@ -368,7 +367,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     // Header
@@ -391,7 +390,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         flex: 1,
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginLeft: 8,
     },
@@ -401,7 +400,7 @@ const styles = StyleSheet.create({
     },
     markAllText: {
         fontSize: 13,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
     // Filter
@@ -426,7 +425,7 @@ const styles = StyleSheet.create({
     },
     filterText: {
         fontSize: 13,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
     },
     filterTextActive: {
@@ -442,7 +441,7 @@ const styles = StyleSheet.create({
     },
     countText: {
         fontSize: 11,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     scrollView: {
@@ -487,11 +486,11 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     titleUnread: {
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
     },
     unreadDot: {
         width: 8,
@@ -501,13 +500,13 @@ const styles = StyleSheet.create({
     },
     message: {
         fontSize: 13,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     time: {
         fontSize: 11,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -529,13 +528,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         textAlign: 'center',
         paddingHorizontal: 32,

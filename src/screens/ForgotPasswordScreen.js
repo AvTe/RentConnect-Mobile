@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 30,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     paddingHorizontal: 16,
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#FE9200',
-    borderRadius: 12,
+    borderRadius: 30,
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',

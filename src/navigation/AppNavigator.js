@@ -1,13 +1,13 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONTS } from '../constants/theme';
 
 // Auth Screens
 import LandingScreen from '../screens/LandingScreen';
@@ -39,6 +39,7 @@ import LeadFiltersScreen from '../screens/agent/LeadFiltersScreen';
 // Profile & Settings Screens
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
+import LanguageScreen from '../screens/settings/LanguageScreen';
 
 // Support Screens
 import SupportScreen from '../screens/support/SupportScreen';
@@ -46,18 +47,10 @@ import SupportScreen from '../screens/support/SupportScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const COLORS = {
-  primary: '#FE9200',
-  primaryLight: '#FFF5E6',
-  inactive: '#9CA3AF',
-  background: '#FFFFFF',
-  border: '#E5E7EB',
-  dark: '#1F2937',
-};
-
-// Agent Tab Bar Component - Modern Pill Style
+// Agent Tab Bar Component - Clean Bottom Navigation
 const AgentTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const renderTab = (route, index) => {
     const isFocused = state.index === index;
@@ -68,7 +61,7 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
     switch (route.name) {
       case 'AgentLeads':
         iconName = 'grid';
-        label = 'Dashboard';
+        label = 'Dash';
         break;
       case 'AgentProperties':
         iconName = 'home';
@@ -109,23 +102,32 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
         style={styles.agentTabItem}
         onPress={onPress}
         activeOpacity={0.7}
+        accessibilityRole="tab"
+        accessibilityLabel={`${label} tab`}
+        accessibilityState={{ selected: isFocused }}
       >
-        {isFocused ? (
-          <View style={styles.agentActivePill}>
-            <Feather name={iconName} size={18} color={COLORS.primary} />
-            <Text style={styles.agentActiveLabel}>{label}</Text>
-          </View>
-        ) : (
-          <View style={styles.agentInactiveTab}>
-            <Feather name={iconName} size={22} color={COLORS.inactive} />
-          </View>
-        )}
+        <View style={[
+          styles.agentTabIcon,
+          isFocused && { backgroundColor: colors.primaryLight }
+        ]}>
+          <Feather
+            name={iconName}
+            size={20}
+            color={isFocused ? colors.primary : colors.textSecondary}
+          />
+        </View>
+        <Text style={[
+          styles.agentTabLabel,
+          { color: isFocused ? colors.primary : colors.textSecondary }
+        ]}>
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={[styles.agentTabBarWrapper, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.agentTabBarWrapper, { paddingBottom: insets.bottom, backgroundColor: colors.card, borderTopColor: colors.border }]}>
       <View style={styles.agentTabBarContainer}>
         {state.routes.map((route, index) => renderTab(route, index))}
       </View>
@@ -136,6 +138,7 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
 // Tenant Custom Tab Bar Component with Center + Button
 const TenantTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const leftTabs = state.routes.slice(0, 2);
   const rightTabs = state.routes.slice(3);
@@ -186,15 +189,18 @@ const TenantTabBar = ({ state, descriptors, navigation }) => {
         style={styles.tabItem}
         onPress={onPress}
         activeOpacity={0.7}
+        accessibilityRole="tab"
+        accessibilityLabel={`${label} tab`}
+        accessibilityState={{ selected: isFocused }}
       >
         {isFocused ? (
-          <View style={styles.activePill}>
-            <Feather name={iconName} size={18} color={COLORS.primary} />
-            <Text style={styles.activeLabel}>{label}</Text>
+          <View style={[styles.activePill, { backgroundColor: colors.primaryLight }]}>
+            <Feather name={iconName} size={18} color={colors.primary} />
+            <Text style={[styles.activeLabel, { color: colors.primary }]}>{label}</Text>
           </View>
         ) : (
           <View style={styles.inactiveTab}>
-            <Feather name={iconName} size={22} color={COLORS.inactive} />
+            <Feather name={iconName} size={22} color={colors.textSecondary} />
           </View>
         )}
       </TouchableOpacity>
@@ -206,19 +212,21 @@ const TenantTabBar = ({ state, descriptors, navigation }) => {
   };
 
   return (
-    <View style={[styles.tabBarWrapper, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.tabBarWrapper, { paddingBottom: insets.bottom, backgroundColor: colors.card, borderTopColor: colors.border }]}>
       <View style={styles.tabBarContainer}>
         <View style={styles.tabGroup}>
           {leftTabs.map((route, index) => renderTab(route, index, index))}
         </View>
 
         <TouchableOpacity
-          style={styles.addButtonWrapper}
+          style={[styles.addButtonWrapper, { backgroundColor: colors.card }]}
           onPress={handleAddPress}
           activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel="Post new rental request"
         >
           <LinearGradient
-            colors={[COLORS.primary, '#E58300']}
+            colors={[colors.primary, '#E58300']}
             style={styles.addButton}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -311,6 +319,11 @@ const TenantMainStack = () => {
         component={SupportScreen}
         options={{ animation: 'slide_from_right' }}
       />
+      <Stack.Screen
+        name="LanguageSettings"
+        component={LanguageScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 };
@@ -375,12 +388,23 @@ const AgentMainStack = () => {
         component={SupportScreen}
         options={{ animation: 'slide_from_right' }}
       />
+      <Stack.Screen
+        name="LanguageSettings"
+        component={LanguageScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 };
 
 const AppNavigator = () => {
   const { user, loading, isAgent, isTenant } = useAuth();
+  const { isDark, colors } = useTheme();
 
   if (loading) {
     return <SplashScreen />;
@@ -399,8 +423,39 @@ const AppNavigator = () => {
     return <TenantMainStack />;
   };
 
+  // Custom navigation theme based on app theme
+  const navigationTheme = {
+    dark: isDark,
+    colors: {
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.primary,
+    },
+    fonts: {
+      regular: {
+        fontFamily: 'DMSans_400Regular',
+        fontWeight: 'normal',
+      },
+      medium: {
+        fontFamily: 'DMSans_500Medium',
+        fontWeight: '500',
+      },
+      bold: {
+        fontFamily: 'DMSans_700Bold',
+        fontWeight: 'bold',
+      },
+      heavy: {
+        fontFamily: 'DMSans_700Bold',
+        fontWeight: '900',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       {renderMainStack()}
     </NavigationContainer>
   );
@@ -415,9 +470,7 @@ const styles = StyleSheet.create({
   },
   // Tenant Tab Bar Styles
   tabBarWrapper: {
-    backgroundColor: COLORS.background,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
   },
   tabBarContainer: {
     flexDirection: 'row',
@@ -440,7 +493,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -448,8 +500,7 @@ const styles = StyleSheet.create({
   },
   activeLabel: {
     fontSize: 12,
-    fontFamily: FONTS.semiBold,
-    color: COLORS.primary,
+    fontFamily: 'DMSans_600SemiBold',
   },
   inactiveTab: {
     alignItems: 'center',
@@ -460,7 +511,6 @@ const styles = StyleSheet.create({
     marginTop: -30,
     borderRadius: 30,
     padding: 4,
-    backgroundColor: COLORS.background,
   },
   addButton: {
     width: 56,
@@ -469,56 +519,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Agent Tab Bar Styles - Modern Pill Style
+  // Agent Tab Bar Styles - Clean Bottom Navigation
   agentTabBarWrapper: {
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    borderTopWidth: 1,
   },
   agentTabBarContainer: {
     flexDirection: 'row',
-    height: 56,
+    height: 60,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.background,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    justifyContent: 'space-around',
     paddingHorizontal: 8,
   },
   agentTabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
-  agentActivePill: {
-    flexDirection: 'row',
+  agentTabIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 22,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  agentActiveLabel: {
-    fontSize: 12,
-    fontFamily: FONTS.semiBold,
-    color: COLORS.primary,
-  },
-  agentInactiveTab: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
   },
   agentTabLabel: {
-    fontSize: 11,
-    fontFamily: FONTS.medium,
-    marginTop: 4,
+    fontSize: 10,
+    fontFamily: 'DMSans_500Medium',
+    marginTop: 2,
   },
 });
 
 export default AppNavigator;
+

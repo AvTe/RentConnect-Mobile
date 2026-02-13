@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { getWalletBalance } from '../../lib/database';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -69,7 +68,7 @@ const AgentAccountScreen = ({ navigation }) => {
         return name.charAt(0).toUpperCase();
     };
 
-    const isVerified = userData?.kyc_status === 'verified' || true;
+    const isVerified = userData?.verification_status === 'verified' || userData?.kyc_status === 'verified';
 
     const MenuItem = ({ icon, iconBg, iconColor, title, value, valueColor, onPress, isExternal }) => (
         <TouchableOpacity
@@ -241,7 +240,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 24,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     settingsButton: {
@@ -281,7 +280,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 36,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     verifiedBadge: {
@@ -299,7 +298,7 @@ const styles = StyleSheet.create({
     },
     profileName: {
         fontSize: 22,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginBottom: 6,
     },
@@ -314,7 +313,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 13,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.success,
     },
     statsRow: {
@@ -336,19 +335,19 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: 11,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
         marginBottom: 4,
     },
     statValue: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     statValueDark: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     menuSection: {
@@ -375,7 +374,7 @@ const styles = StyleSheet.create({
     menuTitle: {
         flex: 1,
         fontSize: 15,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
         marginLeft: 14,
     },
@@ -386,7 +385,7 @@ const styles = StyleSheet.create({
     },
     menuValue: {
         fontSize: 13,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
     },
     menuDivider: {
@@ -406,13 +405,13 @@ const styles = StyleSheet.create({
     },
     signOutText: {
         fontSize: 16,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: '#FFFFFF',
     },
     versionText: {
         textAlign: 'center',
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 16,
     },

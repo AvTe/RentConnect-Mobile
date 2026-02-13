@@ -74,8 +74,7 @@ const MyRequestsScreen = ({ navigation }) => {
             'Manage Request',
             'What would you like to do?',
             [
-                { text: 'View Details', onPress: () => navigation.navigate('RequestDetail', { requestId: request.id }) },
-                { text: 'Edit', onPress: () => navigation.navigate('RequestDetail', { requestId: request.id, edit: true }) },
+                { text: 'View Details', onPress: () => Alert.alert('Request Details', `Location: ${request.location || 'N/A'}\nType: ${request.property_type || 'N/A'}\nBudget: ${request.budget || 'N/A'}\nStatus: ${request.status || 'N/A'}`) },
                 { text: request.status === 'active' ? 'Pause' : 'Activate', onPress: () => toggleStatus(request) },
                 { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(request) },
                 { text: 'Cancel', style: 'cancel' },
@@ -86,13 +85,15 @@ const MyRequestsScreen = ({ navigation }) => {
     const toggleStatus = async (request) => {
         const newStatus = request.status === 'active' ? 'paused' : 'active';
         try {
-            await supabase
+            const { error } = await supabase
                 .from('leads')
                 .update({ status: newStatus })
                 .eq('id', request.id);
+            if (error) throw error;
             fetchRequests();
             toast.success('Status updated successfully');
         } catch (error) {
+            console.error('Toggle status error:', error);
             toast.error('Failed to update status');
         }
     };
@@ -110,13 +111,15 @@ const MyRequestsScreen = ({ navigation }) => {
 
     const deleteRequest = async (request) => {
         try {
-            await supabase
+            const { error } = await supabase
                 .from('leads')
                 .delete()
                 .eq('id', request.id);
+            if (error) throw error;
             fetchRequests();
             toast.success('Request deleted successfully');
         } catch (error) {
+            console.error('Delete request error:', error);
             toast.error('Failed to delete request');
         }
     };
@@ -273,7 +276,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderRadius: 14,
+        borderRadius: 30,
         gap: 8,
     },
     newRequestText: {
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         paddingHorizontal: 24,
         paddingVertical: 14,
-        borderRadius: 14,
+        borderRadius: 30,
         gap: 8,
     },
     createButtonText: {
@@ -330,14 +333,11 @@ const styles = StyleSheet.create({
     },
     requestCard: {
         backgroundColor: COLORS.card,
-        borderRadius: 16,
+        borderRadius: 12,
         padding: 18,
         marginBottom: 14,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -429,3 +429,4 @@ const styles = StyleSheet.create({
 });
 
 export default MyRequestsScreen;
+

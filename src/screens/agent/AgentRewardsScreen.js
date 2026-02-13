@@ -10,8 +10,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -30,7 +28,6 @@ const FILTER_TABS = ['All', 'Active', 'Used', 'Expired'];
 
 const AgentRewardsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
-    const toast = useToast();
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -233,7 +230,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     headerIcon: {
@@ -256,7 +253,7 @@ const styles = StyleSheet.create({
     },
     sectionLabel: {
         fontSize: 12,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
         marginBottom: 12,
@@ -289,12 +286,12 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 28,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     statLabel: {
         fontSize: 10,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
         marginTop: 4,
@@ -318,7 +315,7 @@ const styles = StyleSheet.create({
     },
     filterTabText: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     filterTabTextActive: {
@@ -344,13 +341,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         textAlign: 'center',
         lineHeight: 20,
@@ -364,7 +361,7 @@ const styles = StyleSheet.create({
     },
     premiumButtonText: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: '#FFFFFF',
     },
     howItWorksCard: {
@@ -382,7 +379,7 @@ const styles = StyleSheet.create({
     },
     howItWorksTitle: {
         fontSize: 16,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     stepItem: {
@@ -400,7 +397,7 @@ const styles = StyleSheet.create({
     },
     stepNumberText: {
         fontSize: 14,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
     },
     stepContent: {
@@ -408,13 +405,13 @@ const styles = StyleSheet.create({
     },
     stepTitle: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginBottom: 4,
     },
     stepDescription: {
         fontSize: 13,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         lineHeight: 18,
     },

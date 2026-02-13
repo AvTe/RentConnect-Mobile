@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { FONTS } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import {
     fetchLeads,
     getUnlockedLeadIds,
@@ -29,6 +29,8 @@ import {
 } from '../../lib/leadService';
 import { getWalletBalance } from '../../lib/database';
 
+// Static colors for styles (light mode defaults)
+// Dynamic theming is applied via inline styles using colors from useTheme
 const COLORS = {
     primary: '#FE9200',
     primaryLight: '#FFF5E6',
@@ -49,6 +51,7 @@ const AgentLeadsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const { user, userData } = useAuth();
+    const { colors } = useTheme();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [leads, setLeads] = useState([]);
@@ -376,76 +379,38 @@ const AgentLeadsScreen = ({ navigation }) => {
 
     if (loading) {
         return (
-            <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Loading leads...</Text>
+            <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading leads...</Text>
             </View>
         );
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            {/* Header */}
-            <View style={styles.header}>
+        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+            {/* Fixed Top Header - yoombaa logo and icons */}
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 <View style={styles.headerLeft}>
-                    <Feather name="home" size={24} color={COLORS.primary} />
-                    <Text style={styles.logoText}>yoombaa</Text>
+                    <Feather name="home" size={24} color={colors.primary} />
+                    <Text style={[styles.logoText, { color: colors.text }]}>yoombaa</Text>
                 </View>
                 <View style={styles.headerRight}>
                     <TouchableOpacity
-                        style={styles.headerIconBtn}
+                        style={[styles.headerIconBtn, { backgroundColor: colors.background }]}
                         onPress={() => navigation.navigate('Notifications')}
                     >
-                        <Feather name="bell" size={22} color={COLORS.text} />
+                        <Feather name="bell" size={22} color={colors.text} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={styles.avatarButton}
+                        style={[styles.avatarButton, { backgroundColor: colors.primaryLight }]}
                         onPress={() => navigation.navigate('AgentProfileEdit')}
                     >
-                        <Feather name="user" size={18} color={COLORS.primary} />
+                        <Feather name="user" size={18} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
             </View>
 
-            {/* Greeting Section */}
-            <LinearGradient
-                colors={['#FFF5E6', '#FFFFFF']}
-                style={styles.greetingSection}
-            >
-                <Text style={styles.greetingText}>{getGreeting()}</Text>
-                <Text style={styles.greetingName}>{getUserName()}!</Text>
-            </LinearGradient>
-
-            {/* Leads Dashboard Header */}
-            <View style={styles.dashboardHeader}>
-                <View>
-                    <Text style={styles.dashboardTitle}>Leads Dashboard</Text>
-                    <Text style={styles.dashboardSubtitle}>
-                        {filteredLeads.length} leads available{' '}
-                        <Text style={styles.filterHighlight}>(filtered from {totalLeads})</Text>
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.filterButton}
-                    onPress={() => navigation.navigate('LeadFilters')}
-                >
-                    <Feather name="sliders" size={20} color={COLORS.text} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <Feather name="search" size={18} color={COLORS.textSecondary} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search leads..."
-                    placeholderTextColor={COLORS.textSecondary}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
-
-            {/* Leads List */}
+            {/* Scrollable Content */}
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -458,6 +423,45 @@ const AgentLeadsScreen = ({ navigation }) => {
                     />
                 }
             >
+                {/* Greeting Section - Now scrolls */}
+                <LinearGradient
+                    colors={[colors.primaryLight, colors.background]}
+                    style={styles.greetingSection}
+                >
+                    <Text style={styles.greetingText}>{getGreeting()}</Text>
+                    <Text style={styles.greetingName}>{getUserName()}!</Text>
+                </LinearGradient>
+
+                {/* Leads Dashboard Header - Now scrolls */}
+                <View style={styles.dashboardHeader}>
+                    <View>
+                        <Text style={styles.dashboardTitle}>Leads Dashboard</Text>
+                        <Text style={styles.dashboardSubtitle}>
+                            {filteredLeads.length} leads available{' '}
+                            <Text style={styles.filterHighlight}>(filtered from {totalLeads})</Text>
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.filterButton}
+                        onPress={() => navigation.navigate('LeadFilters')}
+                    >
+                        <Feather name="sliders" size={20} color={COLORS.text} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Search Bar - Now scrolls */}
+                <View style={styles.searchContainer}>
+                    <Feather name="search" size={18} color={COLORS.textSecondary} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search leads..."
+                        placeholderTextColor={COLORS.textSecondary}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                </View>
+
+                {/* Leads List */}
                 {filteredLeads.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Feather name="inbox" size={48} color={COLORS.textSecondary} />
@@ -490,7 +494,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     // Header
@@ -510,7 +514,7 @@ const styles = StyleSheet.create({
     },
     logoText: {
         fontSize: 20,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
         marginLeft: 6,
     },
@@ -543,12 +547,12 @@ const styles = StyleSheet.create({
     },
     greetingText: {
         fontSize: 24,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     greetingName: {
         fontSize: 28,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     // Dashboard Header
@@ -563,12 +567,12 @@ const styles = StyleSheet.create({
     },
     dashboardTitle: {
         fontSize: 20,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     dashboardSubtitle: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -593,7 +597,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginVertical: 12,
         paddingHorizontal: 14,
-        borderRadius: 12,
+        borderRadius: 30,
         borderWidth: 1,
         borderColor: COLORS.border,
         height: 48,
@@ -602,7 +606,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 10,
         fontSize: 15,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.text,
     },
     scrollView: {
@@ -617,13 +621,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginTop: 16,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -662,7 +666,7 @@ const styles = StyleSheet.create({
     },
     statText: {
         fontSize: 13,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.textSecondary,
     },
     budgetBadge: {
@@ -679,7 +683,7 @@ const styles = StyleSheet.create({
     },
     budgetText: {
         fontSize: 12,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.success,
     },
     budgetTextHigh: {
@@ -688,7 +692,7 @@ const styles = StyleSheet.create({
     // Title
     leadTitle: {
         fontSize: 17,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         paddingHorizontal: 16,
         marginBottom: 12,
@@ -714,7 +718,7 @@ const styles = StyleSheet.create({
     },
     tagText: {
         fontSize: 11,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     // Slots Container
@@ -738,7 +742,7 @@ const styles = StyleSheet.create({
     },
     slotsLabel: {
         fontSize: 10,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
@@ -764,7 +768,7 @@ const styles = StyleSheet.create({
     },
     slotNumber: {
         fontSize: 10,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
     },
     slotNumberFilled: {
         color: '#FFFFFF',
@@ -779,7 +783,7 @@ const styles = StyleSheet.create({
     },
     slotsCount: {
         fontSize: 12,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
     },
     statusBadge: {
         paddingHorizontal: 8,
@@ -788,7 +792,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 9,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         letterSpacing: 0.3,
     },
     // Tenant Row
@@ -813,7 +817,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 14,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.textSecondary,
     },
     tenantInfo: {
@@ -821,12 +825,12 @@ const styles = StyleSheet.create({
     },
     tenantName: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     tenantStatus: {
         fontSize: 11,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 1,
     },
@@ -843,7 +847,7 @@ const styles = StyleSheet.create({
     },
     unlockedText: {
         fontSize: 10,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.success,
     },
     // Actions
@@ -865,11 +869,11 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card,
         borderWidth: 1,
         borderColor: COLORS.border,
-        borderRadius: 10,
+        borderRadius: 30,
     },
     callButtonText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     chatButton: {
@@ -880,11 +884,11 @@ const styles = StyleSheet.create({
         gap: 8,
         height: 40,
         backgroundColor: COLORS.primary,
-        borderRadius: 10,
+        borderRadius: 30,
     },
     chatButtonText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: '#FFFFFF',
     },
     unlockActions: {
@@ -897,11 +901,11 @@ const styles = StyleSheet.create({
         gap: 8,
         height: 44,
         backgroundColor: COLORS.primary,
-        borderRadius: 10,
+        borderRadius: 30,
     },
     unlockButtonText: {
         fontSize: 14,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
     },
     exclusiveButton: {
@@ -913,11 +917,11 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card,
         borderWidth: 1,
         borderColor: 'rgba(254, 146, 0, 0.3)',
-        borderRadius: 10,
+        borderRadius: 30,
     },
     exclusiveButtonText: {
         fontSize: 12,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.primary,
     },
     expiredButton: {
@@ -927,11 +931,11 @@ const styles = StyleSheet.create({
         gap: 8,
         height: 44,
         backgroundColor: COLORS.border,
-        borderRadius: 10,
+        borderRadius: 30,
     },
     expiredButtonText: {
         fontSize: 12,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.expired,
         letterSpacing: 0.5,
     },
@@ -942,11 +946,11 @@ const styles = StyleSheet.create({
         gap: 8,
         height: 44,
         backgroundColor: '#FEE2E2',
-        borderRadius: 10,
+        borderRadius: 30,
     },
     soldOutButtonText: {
         fontSize: 12,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.error,
         letterSpacing: 0.5,
     },

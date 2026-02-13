@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { FONTS } from '../constants/theme';
+import { logger } from '../lib/logger';
 import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -69,7 +69,7 @@ const LoginScreen = ({ navigation }) => {
     }
 
     try {
-      console.log('Got Google token, signing in to Supabase...');
+      logger.log('Got Google token, signing in to Supabase...');
 
       // Try with ID token first
       const { data, error } = await supabase.auth.signInWithIdToken({
@@ -81,7 +81,7 @@ const LoginScreen = ({ navigation }) => {
         console.error('Supabase error:', error);
         toast.error(error.message || 'Failed to sign in');
       } else {
-        console.log('Signed in successfully:', data?.user?.email);
+        logger.log('Signed in successfully:', data?.user?.email);
         toast.success('Signed in successfully!');
       }
     } catch (error) {
@@ -100,9 +100,10 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const { error } = await signIn(email, password);
-      if (error) {
-        toast.error(error.message);
+      const result = await signIn(email, password);
+      if (!result.success) {
+        // signIn returns { success: false, error: 'string message' }
+        toast.error(result.error || 'Login failed. Please try again.');
       } else {
         toast.success('Login successful!');
       }
@@ -220,6 +221,8 @@ const LoginScreen = ({ navigation }) => {
               style={styles.loginButton}
               onPress={handleLogin}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in with email and password"
             >
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
@@ -240,6 +243,8 @@ const LoginScreen = ({ navigation }) => {
               style={[styles.googleButton, isExpoGo && styles.googleButtonDisabled]}
               onPress={handleGoogleSignIn}
               disabled={googleLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
             >
               {googleLoading ? (
                 <ActivityIndicator color="#1F2937" />
@@ -288,7 +293,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 30,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
@@ -298,13 +303,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: FONTS.bold,
+    fontFamily: 'DMSans_700Bold',
     color: '#1F2937',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    fontFamily: FONTS.regular,
+    fontFamily: 'DMSans_400Regular',
     color: '#6B7280',
   },
   form: {
@@ -315,7 +320,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: FONTS.medium,
+    fontFamily: 'DMSans_500Medium',
     color: '#374151',
     marginBottom: 8,
   },
@@ -323,7 +328,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    borderRadius: 30,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     paddingHorizontal: 14,
@@ -335,7 +340,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 16,
-    fontFamily: FONTS.regular,
+    fontFamily: 'DMSans_400Regular',
     color: '#1F2937',
   },
   eyeButton: {
@@ -347,19 +352,19 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    fontFamily: FONTS.medium,
+    fontFamily: 'DMSans_500Medium',
     color: '#FE9200',
   },
   loginButton: {
     backgroundColor: '#FE9200',
-    borderRadius: 12,
+    borderRadius: 30,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 24,
   },
   loginButtonText: {
     fontSize: 16,
-    fontFamily: FONTS.semiBold,
+    fontFamily: 'DMSans_600SemiBold',
     color: '#FFFFFF',
   },
   divider: {
@@ -375,7 +380,7 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     fontSize: 14,
-    fontFamily: FONTS.regular,
+    fontFamily: 'DMSans_400Regular',
     color: '#9CA3AF',
   },
   googleButton: {
@@ -383,7 +388,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    borderRadius: 30,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     paddingVertical: 14,
@@ -396,7 +401,7 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontSize: 16,
-    fontFamily: FONTS.medium,
+    fontFamily: 'DMSans_500Medium',
     color: '#1F2937',
   },
   googleButtonTextDisabled: {
@@ -404,7 +409,7 @@ const styles = StyleSheet.create({
   },
   devBadge: {
     fontSize: 10,
-    fontFamily: FONTS.medium,
+    fontFamily: 'DMSans_500Medium',
     color: '#FFFFFF',
     backgroundColor: '#FE9200',
     paddingHorizontal: 6,
@@ -418,12 +423,12 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    fontFamily: FONTS.regular,
+    fontFamily: 'DMSans_400Regular',
     color: '#6B7280',
   },
   signUpLink: {
     fontSize: 14,
-    fontFamily: FONTS.semiBold,
+    fontFamily: 'DMSans_600SemiBold',
     color: '#FE9200',
   },
 });

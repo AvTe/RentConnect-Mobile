@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -40,12 +41,12 @@ export const usePushNotifications = () => {
         // Listen for incoming notifications
         notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
             setNotification(notification);
-            console.log('Notification received:', notification);
+            logger.log('Notification received:', notification);
         });
 
         // Listen for notification responses (when user taps notification)
         responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-            console.log('Notification response:', response);
+            logger.log('Notification response:', response);
             handleNotificationResponse(response);
         });
 
@@ -71,7 +72,7 @@ async function registerForPushNotificationsAsync() {
 
     // Push notifications only work on physical devices
     if (!Device.isDevice) {
-        console.log('Push notifications require a physical device');
+        logger.log('Push notifications require a physical device');
         return null;
     }
 
@@ -96,7 +97,7 @@ async function registerForPushNotificationsAsync() {
     }
 
     if (finalStatus !== 'granted') {
-        console.log('Push notification permission denied');
+        logger.log('Push notification permission denied');
         return null;
     }
 
@@ -111,7 +112,7 @@ async function registerForPushNotificationsAsync() {
             token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
         }
 
-        console.log('Expo Push Token:', token);
+        logger.log('Expo Push Token:', token);
         return token;
     } catch (error) {
         console.error('Error getting push token:', error);
@@ -124,21 +125,20 @@ async function savePushTokenToDatabase(token) {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-            // Update the user's profile with the push token
+            // Update the user's record with the push token
             const { error } = await supabase
-                .from('profiles')
-                .upsert({
-                    id: user.id,
+                .from('users')
+                .update({
                     push_token: token,
                     push_token_updated_at: new Date().toISOString(),
-                }, {
-                    onConflict: 'id'
-                });
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', user.id);
 
             if (error) {
                 console.error('Error saving push token:', error);
             } else {
-                console.log('Push token saved to database');
+                logger.log('Push token saved to database');
             }
         }
     } catch (error) {
@@ -152,13 +152,13 @@ function handleNotificationResponse(response) {
     // Handle different notification types
     if (data?.type === 'lead') {
         // Navigate to lead details
-        console.log('Navigate to lead:', data.leadId);
+        logger.log('Navigate to lead:', data.leadId);
     } else if (data?.type === 'message') {
         // Navigate to messages
-        console.log('Navigate to message:', data.messageId);
+        logger.log('Navigate to message:', data.messageId);
     } else if (data?.type === 'request') {
         // Navigate to request details
-        console.log('Navigate to request:', data.requestId);
+        logger.log('Navigate to request:', data.requestId);
     }
 }
 

@@ -10,7 +10,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../../context/ToastContext';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -390,12 +389,12 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     resetText: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
     scrollView: {
@@ -410,7 +409,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 15,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginBottom: 12,
     },
@@ -434,7 +433,7 @@ const styles = StyleSheet.create({
     },
     chipText: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     chipTextSelected: {
@@ -463,7 +462,7 @@ const styles = StyleSheet.create({
     },
     statusChipText: {
         fontSize: 12,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     statusChipTextSelected: {
@@ -491,12 +490,12 @@ const styles = StyleSheet.create({
     },
     optionText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     optionTextSelected: {
         color: COLORS.primary,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
     },
     // Toggle
     toggleRow: {
@@ -517,7 +516,7 @@ const styles = StyleSheet.create({
     },
     toggleLabel: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     toggle: {
@@ -579,7 +578,7 @@ const styles = StyleSheet.create({
     },
     sortOptionText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     // Bottom Bar
@@ -602,7 +601,7 @@ const styles = StyleSheet.create({
     },
     filterCountText: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     applyButton: {
@@ -617,7 +616,7 @@ const styles = StyleSheet.create({
     },
     applyButtonText: {
         fontSize: 15,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
     },
 });

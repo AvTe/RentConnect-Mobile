@@ -437,10 +437,18 @@ export const incrementLeadViews = async (leadId, agentId) => {
         });
 
         // Increment counter on lead
+        // Fetch current views count and increment manually
+        // (supabase-js v2 does not support .raw())
+        const { data: leadData } = await supabase
+            .from('leads')
+            .select('views')
+            .eq('id', leadId)
+            .single();
+
         await supabase
             .from('leads')
             .update({
-                views: supabase.raw('COALESCE(views, 0) + 1'),
+                views: (leadData?.views || 0) + 1,
                 updated_at: new Date().toISOString()
             })
             .eq('id', leadId);

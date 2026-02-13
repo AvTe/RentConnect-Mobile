@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import YoombaaLogo from '../../assets/yoombaa logo svg.svg';
-import { FONTS } from '../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -64,6 +63,8 @@ const LandingScreen = ({ navigation }) => {
                                 style={styles.primaryButton}
                                 onPress={handleTenantPress}
                                 activeOpacity={0.9}
+                                accessibilityRole="button"
+                                accessibilityLabel="I'm looking to rent - find a home"
                             >
                                 <Feather name="home" size={20} color="#FFFFFF" />
                                 <Text style={styles.primaryButtonText}>I'm Looking to Rent</Text>
@@ -74,6 +75,8 @@ const LandingScreen = ({ navigation }) => {
                                 style={styles.secondaryButton}
                                 onPress={handleAgentPress}
                                 activeOpacity={0.9}
+                                accessibilityRole="button"
+                                accessibilityLabel="I'm a real estate agent - sign up"
                             >
                                 <Feather name="briefcase" size={20} color="#FE9200" />
                                 <Text style={styles.secondaryButtonText}>I'm a Real Estate Agent</Text>
@@ -85,6 +88,8 @@ const LandingScreen = ({ navigation }) => {
                             style={styles.loginLink}
                             onPress={handleLoginPress}
                             activeOpacity={0.7}
+                            accessibilityRole="link"
+                            accessibilityLabel="Already have an account? Sign in"
                         >
                             <Text style={styles.loginText}>
                                 Already have an account? <Text style={styles.loginTextBold}>Sign in</Text>
@@ -122,7 +127,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: 'rgba(255,255,255,0.85)',
         marginTop: 10,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
     },
     bottomCard: {
         backgroundColor: '#FFFFFF',
@@ -133,7 +138,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: '#1F2937',
         textAlign: 'center',
     },
@@ -143,7 +148,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 6,
         marginBottom: 28,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
     },
     buttonsContainer: {
         gap: 12,
@@ -154,13 +159,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 16,
-        borderRadius: 12,
+        borderRadius: 30,
         gap: 10,
     },
     primaryButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
     },
     secondaryButton: {
         backgroundColor: '#FFF5E6',
@@ -168,13 +173,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 16,
-        borderRadius: 12,
+        borderRadius: 30,
         gap: 10,
     },
     secondaryButtonText: {
         color: '#FE9200',
         fontSize: 16,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
     },
     loginLink: {
         alignItems: 'center',
@@ -184,11 +189,11 @@ const styles = StyleSheet.create({
     loginText: {
         fontSize: 14,
         color: '#6B7280',
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
     },
     loginTextBold: {
         color: '#FE9200',
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
     },
 });
 

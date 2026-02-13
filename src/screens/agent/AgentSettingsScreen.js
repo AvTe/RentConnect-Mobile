@@ -12,34 +12,25 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { FONTS } from '../../constants/theme';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    error: '#EF4444',
-};
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage, availableLanguages } from '../../context/LanguageContext';
 
 const AgentSettingsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const { user, userData, signOut } = useAuth();
+    const { colors } = useTheme();
+    const { language, t } = useLanguage();
     const [pushNotifications, setPushNotifications] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(false);
 
     const handleSignOut = () => {
         Alert.alert(
-            'Sign Out',
+            t('signOut'),
             'Are you sure you want to sign out?',
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', style: 'destructive', onPress: signOut },
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('signOut'), style: 'destructive', onPress: signOut },
             ]
         );
     };
@@ -55,39 +46,44 @@ const AgentSettingsScreen = ({ navigation }) => {
         return name.charAt(0).toUpperCase();
     };
 
+    const getCurrentLanguage = () => {
+        const lang = availableLanguages.find(l => l.code === language);
+        return lang ? `${lang.flag} ${lang.name}` : 'English';
+    };
+
     const SettingItem = ({ icon, iconBg, iconColor, title, subtitle, value, onPress, rightElement }) => (
         <TouchableOpacity
-            style={styles.settingItem}
+            style={[styles.settingItem, { backgroundColor: colors.card }]}
             onPress={onPress}
             activeOpacity={onPress ? 0.7 : 1}
             disabled={!onPress && !rightElement}
         >
-            <View style={[styles.settingIcon, { backgroundColor: iconBg || COLORS.background }]}>
-                <Feather name={icon} size={18} color={iconColor || COLORS.textSecondary} />
+            <View style={[styles.settingIcon, { backgroundColor: iconBg || colors.background }]}>
+                <Feather name={icon} size={18} color={iconColor || colors.textSecondary} />
             </View>
             <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>{title}</Text>
-                {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+                <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+                {subtitle && <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
             </View>
-            {value && <Text style={styles.settingValue}>{value}</Text>}
+            {value && <Text style={[styles.settingValue, { color: colors.textSecondary }]}>{value}</Text>}
             {rightElement}
             {onPress && !rightElement && (
-                <Feather name="chevron-right" size={18} color={COLORS.textSecondary} />
+                <Feather name="chevron-right" size={18} color={colors.textSecondary} />
             )}
         </TouchableOpacity>
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
-                    <Feather name="arrow-left" size={22} color={COLORS.text} />
+                    <Feather name="arrow-left" size={22} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>App Settings</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
                 <View style={styles.headerPlaceholder} />
             </View>
 
@@ -97,41 +93,32 @@ const AgentSettingsScreen = ({ navigation }) => {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Profile Card */}
-                <View style={styles.profileCard}>
-                    <View style={styles.profileAvatar}>
-                        <Text style={styles.avatarText}>{getUserInitials()}</Text>
+                <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.profileAvatar, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}>
+                        <Text style={[styles.avatarText, { color: colors.primary }]}>{getUserInitials()}</Text>
                     </View>
                     <View style={styles.profileInfo}>
-                        <Text style={styles.profileName}>{getUserName()}</Text>
-                        <Text style={styles.profileRole}>Yoombaa Agent • Verified</Text>
+                        <Text style={[styles.profileName, { color: colors.text }]}>{getUserName()}</Text>
+                        <Text style={[styles.profileRole, { color: colors.textSecondary }]}>Yoombaa Agent • Verified</Text>
                     </View>
                 </View>
 
-                {/* General Section */}
-                <Text style={styles.sectionLabel}>GENERAL</Text>
-                <View style={styles.sectionCard}>
-                    <SettingItem
-                        icon="moon"
-                        iconBg="#DBEAFE"
-                        iconColor="#3B82F6"
-                        title="Appearance"
-                        value="System"
-                        onPress={() => toast.info('Appearance settings coming soon')}
-                    />
-                    <View style={styles.divider} />
+                {/* Language Section */}
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('language').toUpperCase()}</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="globe"
                         iconBg="#D1FAE5"
                         iconColor="#10B981"
-                        title="Language"
-                        value="English (US)"
-                        onPress={() => toast.info('Language settings coming soon')}
+                        title={t('language')}
+                        value={getCurrentLanguage()}
+                        onPress={() => navigation.navigate('LanguageSettings')}
                     />
                 </View>
 
                 {/* Account Section */}
-                <Text style={styles.sectionLabel}>ACCOUNT</Text>
-                <View style={styles.sectionCard}>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ACCOUNT</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="lock"
                         iconBg="#F3F4F6"
@@ -139,7 +126,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         title="Privacy & Security"
                         onPress={() => toast.info('Privacy settings coming soon')}
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="key"
                         iconBg="#F3F4F6"
@@ -147,7 +134,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         title="Change Password"
                         onPress={() => toast.info('Change password coming soon')}
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="link"
                         iconBg="#F3F4F6"
@@ -158,8 +145,8 @@ const AgentSettingsScreen = ({ navigation }) => {
                 </View>
 
                 {/* Preferences Section */}
-                <Text style={styles.sectionLabel}>PREFERENCES</Text>
-                <View style={styles.sectionCard}>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>PREFERENCES</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="bell"
                         iconBg="#FEF3C7"
@@ -170,12 +157,12 @@ const AgentSettingsScreen = ({ navigation }) => {
                             <Switch
                                 value={pushNotifications}
                                 onValueChange={setPushNotifications}
-                                trackColor={{ false: '#E5E7EB', true: COLORS.primary }}
+                                trackColor={{ false: '#E5E7EB', true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         }
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="mail"
                         iconBg="#EDE9FE"
@@ -186,7 +173,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                             <Switch
                                 value={emailAlerts}
                                 onValueChange={setEmailAlerts}
-                                trackColor={{ false: '#E5E7EB', true: COLORS.primary }}
+                                trackColor={{ false: '#E5E7EB', true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         }
@@ -194,7 +181,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                 </View>
 
                 {/* About Section */}
-                <View style={styles.sectionCard}>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="info"
                         iconBg="#F3F4F6"
@@ -202,7 +189,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         title="About Yoombaa"
                         onPress={() => toast.info('About coming soon')}
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="help-circle"
                         iconBg="#F3F4F6"
@@ -214,16 +201,16 @@ const AgentSettingsScreen = ({ navigation }) => {
 
                 {/* Sign Out Button */}
                 <TouchableOpacity
-                    style={styles.signOutButton}
+                    style={[styles.signOutButton, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}
                     onPress={handleSignOut}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.signOutText}>Log Out</Text>
+                    <Text style={[styles.signOutText, { color: colors.primary }]}>Log Out</Text>
                 </TouchableOpacity>
 
                 {/* Version */}
-                <Text style={styles.versionText}>Yoombaa Agent App</Text>
-                <Text style={styles.versionNumber}>Version 1.0.2</Text>
+                <Text style={[styles.versionText, { color: colors.textSecondary }]}>Yoombaa Agent App</Text>
+                <Text style={[styles.versionNumber, { color: colors.textSecondary }]}>Version 1.0.2</Text>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -234,7 +221,6 @@ const AgentSettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
     },
     header: {
         flexDirection: 'row',
@@ -242,9 +228,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: COLORS.card,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
     },
     backButton: {
         width: 40,
@@ -254,8 +238,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
-        color: COLORS.text,
+        fontFamily: 'DMSans_600SemiBold',
     },
     headerPlaceholder: {
         width: 40,
@@ -269,57 +252,47 @@ const styles = StyleSheet.create({
     profileCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.card,
         borderRadius: 16,
         padding: 16,
         marginBottom: 24,
         borderWidth: 1,
-        borderColor: COLORS.border,
     },
     profileAvatar: {
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: COLORS.primaryLight,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: COLORS.primary,
     },
     avatarText: {
         fontSize: 22,
-        fontFamily: FONTS.bold,
-        color: COLORS.primary,
+        fontFamily: 'DMSans_700Bold',
     },
     profileInfo: {
         marginLeft: 14,
     },
     profileName: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
-        color: COLORS.text,
+        fontFamily: 'DMSans_700Bold',
     },
     profileRole: {
         fontSize: 13,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_400Regular',
         marginTop: 2,
     },
     sectionLabel: {
         fontSize: 12,
-        fontFamily: FONTS.semiBold,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_600SemiBold',
         letterSpacing: 0.5,
         marginBottom: 10,
         marginTop: 8,
     },
     sectionCard: {
-        backgroundColor: COLORS.card,
         borderRadius: 16,
         marginBottom: 16,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: COLORS.border,
     },
     settingItem: {
         flexDirection: 'row',
@@ -340,54 +313,46 @@ const styles = StyleSheet.create({
     },
     settingTitle: {
         fontSize: 15,
-        fontFamily: FONTS.medium,
-        color: COLORS.text,
+        fontFamily: 'DMSans_500Medium',
     },
     settingSubtitle: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_400Regular',
         marginTop: 2,
     },
     settingValue: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_400Regular',
         marginRight: 8,
     },
     divider: {
         height: 1,
-        backgroundColor: COLORS.border,
         marginLeft: 70,
     },
     signOutButton: {
-        backgroundColor: COLORS.primaryLight,
         paddingVertical: 16,
         borderRadius: 14,
         alignItems: 'center',
         marginTop: 8,
         borderWidth: 1,
-        borderColor: COLORS.primary,
     },
     signOutText: {
         fontSize: 16,
-        fontFamily: FONTS.semiBold,
-        color: COLORS.primary,
+        fontFamily: 'DMSans_600SemiBold',
     },
     versionText: {
         textAlign: 'center',
         fontSize: 13,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_400Regular',
         marginTop: 20,
     },
     versionNumber: {
         textAlign: 'center',
         fontSize: 12,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_400Regular',
         marginTop: 4,
     },
 });
 
 export default AgentSettingsScreen;
+

@@ -16,7 +16,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -370,7 +369,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     saveButton: {
@@ -382,7 +381,7 @@ const styles = StyleSheet.create({
     },
     saveButtonText: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
     scrollView: {
@@ -424,7 +423,7 @@ const styles = StyleSheet.create({
     },
     photoPlaceholderText: {
         fontSize: 40,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     cameraIcon: {
@@ -442,7 +441,7 @@ const styles = StyleSheet.create({
     },
     changePhotoText: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
     // Sections
@@ -451,7 +450,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginBottom: 12,
     },
@@ -461,7 +460,7 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
         marginBottom: 6,
     },
@@ -473,7 +472,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 15,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.text,
     },
     inputMultiline: {
@@ -510,12 +509,12 @@ const styles = StyleSheet.create({
     },
     quickLinkTitle: {
         fontSize: 15,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     quickLinkSubtitle: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 1,
     },

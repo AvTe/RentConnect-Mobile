@@ -1,6 +1,7 @@
-﻿import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { createUser, getUser, updateUser } from '../lib/database';
+import { logger } from '../lib/logger';
 
 const AuthContext = createContext({});
 
@@ -27,7 +28,7 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event);
+        logger.log('Auth state changed:', event);
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -58,7 +59,7 @@ export const AuthProvider = ({ children }) => {
         setUserData(result.data);
       } else {
         // User might not exist in users table yet (new signup)
-        console.log('User not found in database, might be new signup');
+        logger.log('User not found in database, might be new signup');
         setUserData(null);
       }
     } catch (error) {

@@ -1,10 +1,9 @@
 // Theme constants for the entire app
-export const FONTS = {
-    regular: 'DMSans_400Regular',
-    medium: 'DMSans_500Medium',
-    semiBold: 'DMSans_600SemiBold',
-    bold: 'DMSans_700Bold',
-};
+// Import FONTS from isolated file to prevent circular dependencies
+import FONTS from './fonts';
+
+// Re-export FONTS for backward compatibility
+export { FONTS };
 
 export const COLORS = {
     primary: '#FE9200',

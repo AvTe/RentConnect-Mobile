@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,15 +10,25 @@ import {
     ActivityIndicator,
     Image,
     Alert,
+    Modal,
+    Dimensions,
+    Share,
+    Linking,
+    Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { Video, ResizeMode } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
-import { FONTS } from '../../constants/theme';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const COLORS = {
     primary: '#FE9200',
@@ -42,24 +52,38 @@ const AgentAssetsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const { user, userData } = useAuth();
+    const videoRef = useRef(null);
+
+    // States
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewMode, setViewMode] = useState('grid'); // grid or list
+    const [viewMode, setViewMode] = useState('grid');
+    const [activeTab, setActiveTab] = useState('all'); // all, images, videos, documents
 
     // Data states
+    const [assets, setAssets] = useState([]);
+    const [properties, setProperties] = useState([]);
     const [storageUsage, setStorageUsage] = useState({
         totalUsed: 0,
-        limit: 50 * 1024 * 1024, // 50 MB default
+        limit: 50 * 1024 * 1024,
         imageCount: 0,
         videoCount: 0,
         documentCount: 0,
     });
-    const [folders, setFolders] = useState([]);
-    const [recentFiles, setRecentFiles] = useState([]);
 
+    // Modal states
+    const [selectedAsset, setSelectedAsset] = useState(null);
+    const [previewModalVisible, setPreviewModalVisible] = useState(false);
+    const [folderModalVisible, setFolderModalVisible] = useState(false);
+    const [selectedFolder, setSelectedFolder] = useState(null);
+    const [menuModalVisible, setMenuModalVisible] = useState(false);
+    const [menuTarget, setMenuTarget] = useState(null);
+
+    // Helper functions
     const formatBytes = (bytes) => {
-        if (bytes === 0) return '0 B';
+        if (!bytes || bytes === 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -67,75 +91,197 @@ const AgentAssetsScreen = ({ navigation }) => {
     };
 
     const getStoragePercentage = () => {
-        return (storageUsage.totalUsed / storageUsage.limit) * 100;
+        return Math.min((storageUsage.totalUsed / storageUsage.limit) * 100, 100);
     };
 
+    const getFileType = (mimeType, fileName) => {
+        if (!mimeType && fileName) {
+            const ext = fileName.split('.').pop()?.toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext)) return 'image';
+            if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) return 'video';
+            if (['pdf'].includes(ext)) return 'pdf';
+            if (['doc', 'docx'].includes(ext)) return 'doc';
+            return 'file';
+        }
+        if (mimeType?.startsWith('image')) return 'image';
+        if (mimeType?.startsWith('video')) return 'video';
+        if (mimeType?.includes('pdf')) return 'pdf';
+        if (mimeType?.includes('document') || mimeType?.includes('msword')) return 'doc';
+        return 'file';
+    };
+
+    const getFileIcon = (type) => {
+        switch (type) {
+            case 'image': return 'image';
+            case 'video': return 'video';
+            case 'pdf': return 'file-text';
+            case 'doc': return 'file';
+            default: return 'file';
+        }
+    };
+
+    const getFileIconBg = (type) => {
+        switch (type) {
+            case 'image': return COLORS.blueLight;
+            case 'video': return COLORS.purpleLight;
+            case 'pdf': return COLORS.primaryLight;
+            case 'doc': return COLORS.successLight;
+            default: return COLORS.background;
+        }
+    };
+
+    const getFileIconColor = (type) => {
+        switch (type) {
+            case 'image': return COLORS.blue;
+            case 'video': return COLORS.purple;
+            case 'pdf': return COLORS.primary;
+            case 'doc': return COLORS.success;
+            default: return COLORS.textSecondary;
+        }
+    };
+
+    // Fetch assets from Supabase
     const fetchAssets = useCallback(async () => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setLoading(false);
+            return;
+        }
 
         try {
-            // Fetch folders
-            const { data: foldersData, error: foldersError } = await supabase
-                .from('agent_folders')
-                .select('*')
-                .eq('agent_id', user.id)
-                .order('created_at', { ascending: false });
-
-            if (foldersError) throw foldersError;
-
-            // Fetch assets
+            // Fetch all assets for this agent
             const { data: assetsData, error: assetsError } = await supabase
                 .from('agent_assets')
                 .select('*')
                 .eq('agent_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (assetsError) throw assetsError;
+            if (assetsError) {
+                console.error('Assets error:', assetsError);
+                throw assetsError;
+            }
+
+            const assetsList = assetsData || [];
 
             // Calculate storage usage
-            const assets = assetsData || [];
-            const totalUsed = assets.reduce((sum, asset) => sum + (asset.file_size || 0), 0);
-            const imageCount = assets.filter(a => a.file_type?.startsWith('image')).length;
-            const videoCount = assets.filter(a => a.file_type?.startsWith('video')).length;
-            const documentCount = assets.filter(a =>
-                !a.file_type?.startsWith('image') && !a.file_type?.startsWith('video')
+            const totalUsed = assetsList.reduce((sum, asset) => sum + (asset.file_size || 0), 0);
+            const imageCount = assetsList.filter(a => getFileType(a.file_type, a.file_name) === 'image').length;
+            const videoCount = assetsList.filter(a => getFileType(a.file_type, a.file_name) === 'video').length;
+            const documentCount = assetsList.filter(a =>
+                !['image', 'video'].includes(getFileType(a.file_type, a.file_name))
             ).length;
 
             setStorageUsage({
-                ...storageUsage,
                 totalUsed,
+                limit: 50 * 1024 * 1024,
                 imageCount,
                 videoCount,
                 documentCount,
             });
 
-            // Map folders with asset counts
-            const foldersWithCounts = (foldersData || []).map(folder => ({
-                ...folder,
-                assetCount: assets.filter(a => a.folder_id === folder.id).length,
-            }));
+            // Group assets by property/folder
+            const propertyMap = {};
+            assetsList.forEach(asset => {
+                const propName = asset.property_name || asset.folder_name || 'Uncategorized';
+                if (!propertyMap[propName]) {
+                    propertyMap[propName] = {
+                        id: propName,
+                        name: propName,
+                        location: asset.property_location || asset.location || '',
+                        assets: [],
+                        thumbnail: null,
+                    };
+                }
+                propertyMap[propName].assets.push(asset);
+                // Set first image as thumbnail
+                if (!propertyMap[propName].thumbnail && getFileType(asset.file_type, asset.file_name) === 'image') {
+                    propertyMap[propName].thumbnail = asset.file_url;
+                }
+            });
 
-            setFolders(foldersWithCounts);
-            setRecentFiles(assets.slice(0, 5));
+            setProperties(Object.values(propertyMap));
+            setAssets(assetsList);
+
         } catch (error) {
             console.error('Error fetching assets:', error);
             // Use demo data on error
-            setFolders([
-                { id: '1', name: 'Meru Luxury...', location: 'Meru', assetCount: 1 },
-                { id: '2', name: 'Nairobi...', location: 'Nairobi', assetCount: 3 },
-                { id: '3', name: 'Westlands Office', location: 'Nairobi', assetCount: 12 },
-            ]);
-            setRecentFiles([
-                { id: '1', file_name: 'Living_Room_View_01.jpg', folder_name: 'Meru Luxury Houses', file_size: 2.4 * 1024 * 1024, file_type: 'image/jpeg' },
-                { id: '2', file_name: 'Lease_Agreement_Draft.pdf', folder_name: 'Nairobi Apartments', file_size: 1.1 * 1024 * 1024, file_type: 'application/pdf' },
-            ]);
+            const demoAssets = [
+                {
+                    id: '1',
+                    file_name: 'Living_Room_View_01.jpg',
+                    property_name: 'Meru Luxury Houses',
+                    location: 'Meru',
+                    file_size: 2.4 * 1024 * 1024,
+                    file_type: 'image/jpeg',
+                    file_url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
+                    created_at: new Date().toISOString(),
+                },
+                {
+                    id: '2',
+                    file_name: 'Master_Bedroom.jpg',
+                    property_name: 'Meru Luxury Houses',
+                    location: 'Meru',
+                    file_size: 1.8 * 1024 * 1024,
+                    file_type: 'image/jpeg',
+                    file_url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800',
+                    created_at: new Date().toISOString(),
+                },
+                {
+                    id: '3',
+                    file_name: 'Apartment_Tour.mp4',
+                    property_name: 'Nairobi Apartments 32B',
+                    location: 'Nairobi',
+                    file_size: 15 * 1024 * 1024,
+                    file_type: 'video/mp4',
+                    file_url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                    created_at: new Date().toISOString(),
+                },
+                {
+                    id: '4',
+                    file_name: 'Lease_Agreement.pdf',
+                    property_name: 'Nairobi Apartments 32B',
+                    location: 'Nairobi',
+                    file_size: 1.1 * 1024 * 1024,
+                    file_type: 'application/pdf',
+                    file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', // FIXME: Replace with actual document URL from Supabase storage
+                    created_at: new Date().toISOString(),
+                },
+                {
+                    id: '5',
+                    file_name: 'Kitchen_Photo.jpg',
+                    property_name: 'Nairobi Apartments 32B',
+                    location: 'Nairobi',
+                    file_size: 2.0 * 1024 * 1024,
+                    file_type: 'image/jpeg',
+                    file_url: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800',
+                    created_at: new Date().toISOString(),
+                },
+            ];
+
+            setAssets(demoAssets);
+
+            // Calculate from demo data
+            const totalUsed = demoAssets.reduce((sum, a) => sum + (a.file_size || 0), 0);
             setStorageUsage({
-                totalUsed: 9.73 * 1024 * 1024,
+                totalUsed,
                 limit: 50 * 1024 * 1024,
-                imageCount: 4,
-                videoCount: 1,
-                documentCount: 1,
+                imageCount: demoAssets.filter(a => getFileType(a.file_type, a.file_name) === 'image').length,
+                videoCount: demoAssets.filter(a => getFileType(a.file_type, a.file_name) === 'video').length,
+                documentCount: demoAssets.filter(a => !['image', 'video'].includes(getFileType(a.file_type, a.file_name))).length,
             });
+
+            // Group demo assets
+            const propMap = {};
+            demoAssets.forEach(asset => {
+                const name = asset.property_name || 'Uncategorized';
+                if (!propMap[name]) {
+                    propMap[name] = { id: name, name, location: asset.location || '', assets: [], thumbnail: null };
+                }
+                propMap[name].assets.push(asset);
+                if (!propMap[name].thumbnail && getFileType(asset.file_type, asset.file_name) === 'image') {
+                    propMap[name].thumbnail = asset.file_url;
+                }
+            });
+            setProperties(Object.values(propMap));
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -151,32 +297,76 @@ const AgentAssetsScreen = ({ navigation }) => {
         fetchAssets();
     };
 
+    // File upload handler
     const handleUpload = async () => {
         Alert.alert(
             'Upload File',
-            'Choose file type to upload',
+            'Choose what to upload',
             [
                 {
-                    text: 'Photo',
+                    text: 'Photo/Video',
                     onPress: async () => {
-                        const result = await ImagePicker.launchImageLibraryAsync({
-                            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                            allowsEditing: true,
-                            quality: 0.8,
-                        });
-                        if (!result.canceled) {
-                            toast.success('Photo selected! Upload coming soon.');
+                        try {
+                            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                            if (status !== 'granted') {
+                                Alert.alert('Permission Required', 'Please grant media library access.');
+                                return;
+                            }
+
+                            const result = await ImagePicker.launchImageLibraryAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                                allowsEditing: false,
+                                quality: 0.8,
+                            });
+
+                            if (!result.canceled && result.assets?.[0]) {
+                                await uploadFile(result.assets[0]);
+                            }
+                        } catch (error) {
+                            console.error('Image picker error:', error);
+                            toast.error('Failed to select file');
                         }
                     },
                 },
                 {
                     text: 'Document',
                     onPress: async () => {
-                        const result = await DocumentPicker.getDocumentAsync({
-                            type: '*/*',
-                        });
-                        if (result.type !== 'cancel') {
-                            toast.success('Document selected! Upload coming soon.');
+                        try {
+                            const result = await DocumentPicker.getDocumentAsync({
+                                type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                                copyToCacheDirectory: true,
+                            });
+
+                            if (!result.canceled && result.assets?.[0]) {
+                                await uploadFile(result.assets[0]);
+                            }
+                        } catch (error) {
+                            console.error('Document picker error:', error);
+                            toast.error('Failed to select document');
+                        }
+                    },
+                },
+                {
+                    text: 'Take Photo',
+                    onPress: async () => {
+                        try {
+                            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                            if (status !== 'granted') {
+                                Alert.alert('Permission Required', 'Please grant camera access.');
+                                return;
+                            }
+
+                            const result = await ImagePicker.launchCameraAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                quality: 0.8,
+                            });
+
+                            if (!result.canceled && result.assets?.[0]) {
+                                await uploadFile(result.assets[0]);
+                            }
+                        } catch (error) {
+                            console.error('Camera error:', error);
+                            toast.error('Failed to capture photo');
                         }
                     },
                 },
@@ -185,96 +375,499 @@ const AgentAssetsScreen = ({ navigation }) => {
         );
     };
 
-    const handleCreateFolder = () => {
-        Alert.prompt(
-            'Create Property Folder',
-            'Enter property name',
+    const uploadFile = async (file) => {
+        setUploading(true);
+        try {
+            const fileName = file.fileName || file.name || `file_${Date.now()}`;
+            const fileType = file.mimeType || file.type || 'application/octet-stream';
+
+            // For now, just add to local state (since no storage bucket exists)
+            const newAsset = {
+                id: Date.now().toString(),
+                file_name: fileName,
+                file_type: fileType,
+                file_size: file.fileSize || 0,
+                file_url: file.uri,
+                property_name: 'Uploaded Files',
+                location: 'Local',
+                created_at: new Date().toISOString(),
+                agent_id: user?.id,
+            };
+
+            // Try to upload to Supabase if storage is available
+            try {
+                // Insert record into agent_assets table
+                const { data, error } = await supabase
+                    .from('agent_assets')
+                    .insert({
+                        agent_id: user?.id,
+                        file_name: fileName,
+                        file_type: fileType,
+                        file_size: file.fileSize || 0,
+                        file_url: file.uri, // Would be replaced with storage URL
+                        property_name: 'Uploaded Files',
+                        created_at: new Date().toISOString(),
+                    })
+                    .select()
+                    .single();
+
+                if (!error && data) {
+                    newAsset.id = data.id;
+                }
+            } catch (dbError) {
+                logger.log('DB insert skipped:', dbError);
+            }
+
+            setAssets(prev => [newAsset, ...prev]);
+            toast.success('File uploaded successfully!');
+            fetchAssets(); // Refresh to update counts
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            toast.error('Failed to upload file');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // File actions
+    const handleOpenFile = (asset) => {
+        const type = getFileType(asset.file_type, asset.file_name);
+
+        if (type === 'image' || type === 'video') {
+            setSelectedAsset(asset);
+            setPreviewModalVisible(true);
+        } else if (type === 'pdf' || type === 'doc') {
+            // Open document in browser
+            if (asset.file_url) {
+                WebBrowser.openBrowserAsync(asset.file_url).catch(() => {
+                    Linking.openURL(asset.file_url);
+                });
+            } else {
+                toast.info('Document preview not available');
+            }
+        } else {
+            toast.info(`Opening ${asset.file_name}`);
+        }
+    };
+
+    const handleShareFile = async (asset) => {
+        try {
+            if (asset.file_url) {
+                await Share.share({
+                    message: `Check out this file: ${asset.file_name}`,
+                    url: asset.file_url,
+                    title: asset.file_name,
+                });
+            } else {
+                toast.info('File sharing not available for local files');
+            }
+        } catch (error) {
+            console.error('Share error:', error);
+        }
+    };
+
+    const handleDeleteFile = (asset) => {
+        Alert.alert(
+            'Delete File',
+            `Are you sure you want to delete "${asset.file_name}"?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Create',
-                    onPress: (name) => {
-                        if (name) {
-                            toast.success(`Folder "${name}" created!`);
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await supabase
+                                .from('agent_assets')
+                                .delete()
+                                .eq('id', asset.id);
+
+                            setAssets(prev => prev.filter(a => a.id !== asset.id));
+                            toast.success('File deleted');
+                            fetchAssets();
+                        } catch (error) {
+                            console.error('Delete error:', error);
+                            toast.error('Failed to delete file');
                         }
                     },
                 },
-            ],
-            'plain-text'
+            ]
         );
     };
 
-    const getFileIcon = (fileType) => {
-        if (fileType?.startsWith('image')) return 'image';
-        if (fileType?.startsWith('video')) return 'video';
-        if (fileType?.includes('pdf')) return 'file-text';
-        return 'file';
+    const handleEnableSharing = async (asset) => {
+        try {
+            // Toggle sharing status
+            const newSharingStatus = !asset.is_shared;
+
+            await supabase
+                .from('agent_assets')
+                .update({ is_shared: newSharingStatus })
+                .eq('id', asset.id);
+
+            setAssets(prev => prev.map(a =>
+                a.id === asset.id ? { ...a, is_shared: newSharingStatus } : a
+            ));
+
+            toast.success(newSharingStatus ? 'Sharing enabled' : 'Sharing disabled');
+        } catch (error) {
+            console.error('Sharing error:', error);
+            toast.error('Failed to update sharing');
+        }
     };
 
-    const getFileIconBg = (fileType) => {
-        if (fileType?.startsWith('image')) return COLORS.blueLight;
-        if (fileType?.startsWith('video')) return COLORS.purpleLight;
-        if (fileType?.includes('pdf')) return COLORS.primaryLight;
-        return COLORS.background;
+    const openFolderMenu = (folder) => {
+        setMenuTarget({ type: 'folder', data: folder });
+        setMenuModalVisible(true);
     };
 
-    const getFileIconColor = (fileType) => {
-        if (fileType?.startsWith('image')) return COLORS.blue;
-        if (fileType?.startsWith('video')) return COLORS.purple;
-        if (fileType?.includes('pdf')) return COLORS.primary;
-        return COLORS.textSecondary;
+    const openFileMenu = (file) => {
+        setMenuTarget({ type: 'file', data: file });
+        setMenuModalVisible(true);
     };
 
-    const filteredFolders = folders.filter(folder =>
-        folder.name?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Filter assets based on search and tab
+    const filteredAssets = assets.filter(asset => {
+        const matchesSearch = !searchQuery ||
+            asset.file_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            asset.property_name?.toLowerCase().includes(searchQuery.toLowerCase());
+
+        if (activeTab === 'all') return matchesSearch;
+        const type = getFileType(asset.file_type, asset.file_name);
+        if (activeTab === 'images') return matchesSearch && type === 'image';
+        if (activeTab === 'videos') return matchesSearch && type === 'video';
+        if (activeTab === 'documents') return matchesSearch && !['image', 'video'].includes(type);
+        return matchesSearch;
+    });
 
     // Property Folder Card
-    const FolderCard = ({ folder }) => (
+    const PropertyCard = ({ property }) => {
+        const hasImage = property.thumbnail;
+
+        return (
+            <TouchableOpacity
+                style={styles.propertyCard}
+                onPress={() => {
+                    setSelectedFolder(property);
+                    setFolderModalVisible(true);
+                }}
+                activeOpacity={0.8}
+            >
+                <View style={styles.propertyThumbnail}>
+                    {hasImage ? (
+                        <Image
+                            source={{ uri: property.thumbnail }}
+                            style={styles.thumbnailImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={styles.folderIconContainer}>
+                            <Feather name="folder" size={40} color={COLORS.primary} />
+                        </View>
+                    )}
+                </View>
+                <View style={styles.propertyInfo}>
+                    <View style={styles.propertyHeader}>
+                        <Text style={styles.propertyName} numberOfLines={1}>{property.name}</Text>
+                        <TouchableOpacity onPress={() => openFolderMenu(property)}>
+                            <Feather name="more-vertical" size={18} color={COLORS.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+                    {property.location ? (
+                        <View style={styles.propertyMeta}>
+                            <Feather name="map-pin" size={12} color={COLORS.textSecondary} />
+                            <Text style={styles.propertyLocation}>{property.location}</Text>
+                        </View>
+                    ) : null}
+                    <Text style={styles.propertyFileCount}>
+                        {property.assets?.length || 0} file{(property.assets?.length || 0) !== 1 ? 's' : ''}
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    // File Item Component
+    const FileItem = ({ file, showThumbnail = false }) => {
+        const type = getFileType(file.file_type, file.file_name);
+
+        return (
+            <TouchableOpacity
+                style={styles.fileItem}
+                onPress={() => handleOpenFile(file)}
+                activeOpacity={0.8}
+            >
+                {showThumbnail && type === 'image' && file.file_url ? (
+                    <Image
+                        source={{ uri: file.file_url }}
+                        style={styles.fileThumbnail}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={[styles.fileIcon, { backgroundColor: getFileIconBg(type) }]}>
+                        <Feather name={getFileIcon(type)} size={20} color={getFileIconColor(type)} />
+                    </View>
+                )}
+                <View style={styles.fileInfo}>
+                    <Text style={styles.fileName} numberOfLines={1}>{file.file_name}</Text>
+                    <Text style={styles.fileMeta}>
+                        {file.property_name || 'Unknown'} • {formatBytes(file.file_size)}
+                    </Text>
+                </View>
+                <TouchableOpacity onPress={() => openFileMenu(file)}>
+                    <Feather name="more-vertical" size={18} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+            </TouchableOpacity>
+        );
+    };
+
+    // Grid File Item
+    const GridFileItem = ({ file }) => {
+        const type = getFileType(file.file_type, file.file_name);
+
+        return (
+            <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => handleOpenFile(file)}
+                activeOpacity={0.8}
+            >
+                {type === 'image' && file.file_url ? (
+                    <Image
+                        source={{ uri: file.file_url }}
+                        style={styles.gridThumbnail}
+                        resizeMode="cover"
+                    />
+                ) : type === 'video' ? (
+                    <View style={[styles.gridThumbnail, styles.videoThumbnail]}>
+                        <Feather name="play-circle" size={32} color="#FFFFFF" />
+                    </View>
+                ) : (
+                    <View style={[styles.gridThumbnail, { backgroundColor: getFileIconBg(type) }]}>
+                        <Feather name={getFileIcon(type)} size={32} color={getFileIconColor(type)} />
+                    </View>
+                )}
+                <Text style={styles.gridFileName} numberOfLines={2}>{file.file_name}</Text>
+            </TouchableOpacity>
+        );
+    };
+
+    // Tab Button
+    const TabButton = ({ label, value, count }) => (
         <TouchableOpacity
-            style={styles.folderCard}
-            onPress={() => toast.info(`Opening ${folder.name}`)}
-            activeOpacity={0.8}
+            style={[styles.tabButton, activeTab === value && styles.tabButtonActive]}
+            onPress={() => setActiveTab(value)}
         >
-            <View style={styles.folderIconContainer}>
-                <Feather name="folder" size={40} color={COLORS.primary} />
-            </View>
-            <View style={styles.folderInfo}>
-                <View style={styles.folderHeader}>
-                    <Text style={styles.folderName} numberOfLines={1}>{folder.name}</Text>
-                    <TouchableOpacity>
-                        <Feather name="more-vertical" size={18} color={COLORS.textSecondary} />
-                    </TouchableOpacity>
+            <Text style={[styles.tabText, activeTab === value && styles.tabTextActive]}>
+                {label}
+            </Text>
+            {count > 0 && (
+                <View style={[styles.tabBadge, activeTab === value && styles.tabBadgeActive]}>
+                    <Text style={[styles.tabBadgeText, activeTab === value && styles.tabBadgeTextActive]}>
+                        {count}
+                    </Text>
                 </View>
-                <View style={styles.folderMeta}>
-                    <Feather name="map-pin" size={12} color={COLORS.textSecondary} />
-                    <Text style={styles.folderLocation}>{folder.location}</Text>
-                </View>
-                <Text style={styles.folderFileCount}>{folder.assetCount || 0} file{folder.assetCount !== 1 ? 's' : ''}</Text>
-            </View>
+            )}
         </TouchableOpacity>
     );
 
-    // Recent File Item
-    const FileItem = ({ file }) => (
-        <TouchableOpacity
-            style={styles.fileItem}
-            onPress={() => toast.info(`Opening ${file.file_name}`)}
-            activeOpacity={0.8}
+    // Image/Video Preview Modal
+    const PreviewModal = () => {
+        if (!selectedAsset) return null;
+        const type = getFileType(selectedAsset.file_type, selectedAsset.file_name);
+
+        return (
+            <Modal
+                visible={previewModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPreviewModalVisible(false)}
+            >
+                <View style={styles.previewModal}>
+                    <TouchableOpacity
+                        style={styles.previewClose}
+                        onPress={() => setPreviewModalVisible(false)}
+                    >
+                        <Feather name="x" size={28} color="#FFFFFF" />
+                    </TouchableOpacity>
+
+                    <View style={styles.previewContent}>
+                        {type === 'image' ? (
+                            <Image
+                                source={{ uri: selectedAsset.file_url }}
+                                style={styles.previewImage}
+                                resizeMode="contain"
+                            />
+                        ) : type === 'video' ? (
+                            <Video
+                                ref={videoRef}
+                                source={{ uri: selectedAsset.file_url }}
+                                style={styles.previewVideo}
+                                useNativeControls
+                                resizeMode={ResizeMode.CONTAIN}
+                                shouldPlay
+                            />
+                        ) : null}
+                    </View>
+
+                    <View style={styles.previewInfo}>
+                        <Text style={styles.previewFileName}>{selectedAsset.file_name}</Text>
+                        <Text style={styles.previewFileMeta}>
+                            {formatBytes(selectedAsset.file_size)}
+                        </Text>
+                    </View>
+
+                    <View style={styles.previewActions}>
+                        <TouchableOpacity
+                            style={styles.previewAction}
+                            onPress={() => handleShareFile(selectedAsset)}
+                        >
+                            <Feather name="share-2" size={22} color="#FFFFFF" />
+                            <Text style={styles.previewActionText}>Share</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.previewAction}
+                            onPress={() => {
+                                setPreviewModalVisible(false);
+                                handleDeleteFile(selectedAsset);
+                            }}
+                        >
+                            <Feather name="trash-2" size={22} color="#EF4444" />
+                            <Text style={[styles.previewActionText, { color: '#EF4444' }]}>Delete</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
+
+    // Folder Detail Modal
+    const FolderDetailModal = () => {
+        if (!selectedFolder) return null;
+
+        return (
+            <Modal
+                visible={folderModalVisible}
+                animationType="slide"
+                onRequestClose={() => setFolderModalVisible(false)}
+            >
+                <View style={[styles.folderModal, { paddingTop: insets.top }]}>
+                    <View style={styles.folderModalHeader}>
+                        <TouchableOpacity onPress={() => setFolderModalVisible(false)}>
+                            <Feather name="arrow-left" size={24} color={COLORS.text} />
+                        </TouchableOpacity>
+                        <Text style={styles.folderModalTitle}>{selectedFolder.name}</Text>
+                        <TouchableOpacity onPress={() => openFolderMenu(selectedFolder)}>
+                            <Feather name="more-vertical" size={24} color={COLORS.text} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.folderContent}>
+                        {selectedFolder.assets?.length === 0 ? (
+                            <View style={styles.emptyFolder}>
+                                <Feather name="folder" size={48} color={COLORS.textSecondary} />
+                                <Text style={styles.emptyTitle}>No files in this folder</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.folderGrid}>
+                                {selectedFolder.assets?.map(file => (
+                                    <GridFileItem key={file.id} file={file} />
+                                ))}
+                            </View>
+                        )}
+                    </ScrollView>
+                </View>
+            </Modal>
+        );
+    };
+
+    // Context Menu Modal
+    const MenuModal = () => (
+        <Modal
+            visible={menuModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setMenuModalVisible(false)}
         >
-            <View style={[styles.fileIcon, { backgroundColor: getFileIconBg(file.file_type) }]}>
-                <Feather name={getFileIcon(file.file_type)} size={20} color={getFileIconColor(file.file_type)} />
-            </View>
-            <View style={styles.fileInfo}>
-                <Text style={styles.fileName} numberOfLines={1}>{file.file_name}</Text>
-                <Text style={styles.fileMeta}>
-                    {file.folder_name} • {formatBytes(file.file_size)}
-                </Text>
-            </View>
-            <TouchableOpacity>
-                <Feather name="more-vertical" size={18} color={COLORS.textSecondary} />
+            <TouchableOpacity
+                style={styles.menuOverlay}
+                activeOpacity={1}
+                onPress={() => setMenuModalVisible(false)}
+            >
+                <View style={styles.menuContainer}>
+                    {menuTarget?.type === 'folder' ? (
+                        <>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    setSelectedFolder(menuTarget.data);
+                                    setFolderModalVisible(true);
+                                }}
+                            >
+                                <Feather name="folder" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>Open Folder</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    toast.info('Rename folder coming soon');
+                                }}
+                            >
+                                <Feather name="edit-2" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>Rename</Text>
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleOpenFile(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="eye" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>Preview</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleEnableSharing(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="share-2" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>
+                                    {menuTarget?.data?.is_shared ? 'Disable Sharing' : 'Enable Sharing'}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleShareFile(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="send" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>Send</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.menuItem, styles.menuItemDanger]}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleDeleteFile(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="trash-2" size={20} color={COLORS.error} />
+                                <Text style={[styles.menuText, { color: COLORS.error }]}>Delete</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
             </TouchableOpacity>
-        </TouchableOpacity>
+        </Modal>
     );
 
     if (loading) {
@@ -290,21 +883,16 @@ const AgentAssetsScreen = ({ navigation }) => {
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.menuButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Feather name="menu" size={24} color={COLORS.text} />
+                <TouchableOpacity style={styles.menuButton} onPress={() => navigation.goBack()}>
+                    <Feather name="arrow-left" size={24} color={COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Assets</Text>
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.headerIconBtn}>
+                    <TouchableOpacity
+                        style={styles.headerIconBtn}
+                        onPress={() => navigation.navigate('Notifications')}
+                    >
                         <Feather name="bell" size={22} color={COLORS.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.avatarButton}>
-                        <Text style={styles.avatarText}>
-                            {userData?.name?.charAt(0).toUpperCase() || 'A'}
-                        </Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -329,9 +917,11 @@ const AgentAssetsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.storageInfo}>
                             <Text style={styles.storageTitle}>Storage Used</Text>
-                            <Text style={styles.storageSubtitle}>Manage your files</Text>
+                            <Text style={styles.storageSubtitle}>
+                                {formatBytes(storageUsage.limit - storageUsage.totalUsed)} remaining
+                            </Text>
                         </View>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={() => navigation.navigate('BuyCredits')}>
                             <Text style={styles.upgradeText}>Upgrade</Text>
                         </TouchableOpacity>
                     </View>
@@ -371,7 +961,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                     </View>
                 </View>
 
-                {/* Search Bar */}
+                {/* Search & Filter Row */}
                 <View style={styles.searchRow}>
                     <View style={styles.searchContainer}>
                         <Feather name="search" size={18} color={COLORS.textSecondary} />
@@ -387,56 +977,61 @@ const AgentAssetsScreen = ({ navigation }) => {
                         style={styles.viewToggle}
                         onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
                     >
-                        <Feather
-                            name={viewMode === 'grid' ? 'grid' : 'list'}
-                            size={20}
-                            color={COLORS.textSecondary}
-                        />
+                        <Feather name={viewMode === 'grid' ? 'grid' : 'list'} size={20} color={COLORS.textSecondary} />
                     </TouchableOpacity>
                 </View>
+
+                {/* Filter Tabs */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.tabsContainer}
+                    contentContainerStyle={styles.tabsContent}
+                >
+                    <TabButton label="All" value="all" count={assets.length} />
+                    <TabButton label="Images" value="images" count={storageUsage.imageCount} />
+                    <TabButton label="Videos" value="videos" count={storageUsage.videoCount} />
+                    <TabButton label="Documents" value="documents" count={storageUsage.documentCount} />
+                </ScrollView>
 
                 {/* Properties Section */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>PROPERTIES</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.viewAllText}>View All</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {filteredFolders.length === 0 ? (
-                    <View style={styles.emptyFolders}>
-                        <Feather name="folder-plus" size={48} color={COLORS.textSecondary} />
-                        <Text style={styles.emptyTitle}>No property folders</Text>
-                        <TouchableOpacity
-                            style={styles.createFolderBtn}
-                            onPress={handleCreateFolder}
-                        >
-                            <Text style={styles.createFolderText}>Create Folder</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <View style={styles.foldersGrid}>
-                        {filteredFolders.map((folder) => (
-                            <FolderCard key={folder.id} folder={folder} />
-                        ))}
-                    </View>
+                {activeTab === 'all' && properties.length > 0 && (
+                    <>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>PROPERTIES</Text>
+                        </View>
+                        <View style={styles.propertiesGrid}>
+                            {properties.map((property) => (
+                                <PropertyCard key={property.id} property={property} />
+                            ))}
+                        </View>
+                    </>
                 )}
 
                 {/* Recent Files Section */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>RECENT FILES</Text>
+                    <Text style={styles.sectionTitle}>
+                        {activeTab === 'all' ? 'RECENT FILES' : activeTab.toUpperCase()}
+                    </Text>
+                    <Text style={styles.fileCount}>{filteredAssets.length} items</Text>
                 </View>
 
-                {recentFiles.length === 0 ? (
-                    <View style={styles.emptyFiles}>
+                {filteredAssets.length === 0 ? (
+                    <View style={styles.emptyState}>
                         <Feather name="file" size={48} color={COLORS.textSecondary} />
-                        <Text style={styles.emptyTitle}>No files yet</Text>
+                        <Text style={styles.emptyTitle}>No files found</Text>
                         <Text style={styles.emptyText}>Upload files to see them here</Text>
+                    </View>
+                ) : viewMode === 'grid' ? (
+                    <View style={styles.filesGrid}>
+                        {filteredAssets.map((file) => (
+                            <GridFileItem key={file.id} file={file} />
+                        ))}
                     </View>
                 ) : (
                     <View style={styles.filesList}>
-                        {recentFiles.map((file) => (
-                            <FileItem key={file.id} file={file} />
+                        {filteredAssets.map((file) => (
+                            <FileItem key={file.id} file={file} showThumbnail />
                         ))}
                     </View>
                 )}
@@ -449,9 +1044,19 @@ const AgentAssetsScreen = ({ navigation }) => {
                 style={[styles.fab, { bottom: insets.bottom + 20 }]}
                 onPress={handleUpload}
                 activeOpacity={0.9}
+                disabled={uploading}
             >
-                <Feather name="plus" size={28} color="#FFFFFF" />
+                {uploading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                    <Feather name="plus" size={28} color="#FFFFFF" />
+                )}
             </TouchableOpacity>
+
+            {/* Modals */}
+            <PreviewModal />
+            <FolderDetailModal />
+            <MenuModal />
         </View>
     );
 };
@@ -468,7 +1073,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     // Header
@@ -490,7 +1095,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     headerRight: {
@@ -503,21 +1108,6 @@ const styles = StyleSheet.create({
         height: 36,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    avatarButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: COLORS.primaryLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: COLORS.primary,
-    },
-    avatarText: {
-        fontSize: 14,
-        fontFamily: FONTS.bold,
-        color: COLORS.primary,
     },
     scrollView: {
         flex: 1,
@@ -553,18 +1143,18 @@ const styles = StyleSheet.create({
     },
     storageTitle: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     storageSubtitle: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     upgradeText: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
     storageUsageRow: {
@@ -574,12 +1164,12 @@ const styles = StyleSheet.create({
     },
     storageUsed: {
         fontSize: 28,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     storageLimit: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginLeft: 6,
     },
@@ -612,12 +1202,12 @@ const styles = StyleSheet.create({
     },
     fileTypeCount: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     fileTypeLabel: {
         fontSize: 10,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
@@ -625,7 +1215,7 @@ const styles = StyleSheet.create({
     searchRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
         gap: 10,
     },
     searchContainer: {
@@ -643,7 +1233,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 10,
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.text,
     },
     viewToggle: {
@@ -656,6 +1246,53 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.border,
     },
+    // Tabs
+    tabsContainer: {
+        marginBottom: 16,
+    },
+    tabsContent: {
+        gap: 8,
+    },
+    tabButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        backgroundColor: COLORS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    tabButtonActive: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    tabText: {
+        fontSize: 13,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
+    },
+    tabTextActive: {
+        color: '#FFFFFF',
+    },
+    tabBadge: {
+        marginLeft: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        backgroundColor: COLORS.background,
+    },
+    tabBadgeActive: {
+        backgroundColor: 'rgba(255,255,255,0.3)',
+    },
+    tabBadgeText: {
+        fontSize: 11,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.textSecondary,
+    },
+    tabBadgeTextActive: {
+        color: '#FFFFFF',
+    },
     // Sections
     sectionHeader: {
         flexDirection: 'row',
@@ -665,99 +1302,102 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 12,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
-    viewAllText: {
-        fontSize: 13,
-        fontFamily: FONTS.semiBold,
-        color: COLORS.primary,
+    fileCount: {
+        fontSize: 12,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
     },
-    // Folders Grid
-    foldersGrid: {
+    // Properties Grid
+    propertiesGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         marginHorizontal: -6,
         marginBottom: 24,
     },
-    folderCard: {
+    propertyCard: {
         width: '50%',
         paddingHorizontal: 6,
         marginBottom: 12,
     },
-    folderIconContainer: {
-        backgroundColor: COLORS.primaryLight,
+    propertyThumbnail: {
         borderRadius: 12,
         height: 100,
-        justifyContent: 'center',
-        alignItems: 'center',
+        overflow: 'hidden',
         marginBottom: 8,
     },
-    folderInfo: {
+    thumbnailImage: {
+        width: '100%',
+        height: '100%',
+    },
+    folderIconContainer: {
+        backgroundColor: COLORS.primaryLight,
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    propertyInfo: {
         paddingHorizontal: 4,
     },
-    folderHeader: {
+    propertyHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    folderName: {
+    propertyName: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         flex: 1,
     },
-    folderMeta: {
+    propertyMeta: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
         marginTop: 2,
     },
-    folderLocation: {
+    propertyLocation: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
     },
-    folderFileCount: {
+    propertyFileCount: {
         fontSize: 11,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.primary,
         marginTop: 2,
     },
-    // Empty States
-    emptyFolders: {
-        alignItems: 'center',
-        paddingVertical: 40,
-        marginBottom: 24,
+    // Files Grid
+    filesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -4,
     },
-    emptyFiles: {
-        alignItems: 'center',
-        paddingVertical: 40,
+    gridItem: {
+        width: (SCREEN_WIDTH - 48) / 3,
+        margin: 4,
     },
-    emptyTitle: {
-        fontSize: 16,
-        fontFamily: FONTS.semiBold,
-        color: COLORS.text,
-        marginTop: 12,
-    },
-    emptyText: {
-        fontSize: 13,
-        fontFamily: FONTS.regular,
-        color: COLORS.textSecondary,
-        marginTop: 4,
-    },
-    createFolderBtn: {
-        marginTop: 16,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        backgroundColor: COLORS.primary,
+    gridThumbnail: {
+        width: '100%',
+        aspectRatio: 1,
         borderRadius: 10,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    createFolderText: {
-        fontSize: 14,
-        fontFamily: FONTS.semiBold,
-        color: '#FFFFFF',
+    videoThumbnail: {
+        backgroundColor: COLORS.text,
+    },
+    gridFileName: {
+        fontSize: 11,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.text,
+        marginTop: 4,
+        textAlign: 'center',
     },
     // Files List
     filesList: {
@@ -774,6 +1414,11 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
+    fileThumbnail: {
+        width: 44,
+        height: 44,
+        borderRadius: 10,
+    },
     fileIcon: {
         width: 44,
         height: 44,
@@ -787,14 +1432,35 @@ const styles = StyleSheet.create({
     },
     fileName: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     fileMeta: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
+    },
+    // Empty States
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyFolder: {
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+        marginTop: 12,
+    },
+    emptyText: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 4,
     },
     // FAB
     fab: {
@@ -806,12 +1472,130 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
+        elevation: 5,
+    },
+    // Preview Modal
+    previewModal: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+    },
+    previewClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        zIndex: 10,
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewContent: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewImage: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT * 0.6,
+    },
+    previewVideo: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT * 0.5,
+    },
+    previewInfo: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    previewFileName: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: '#FFFFFF',
+    },
+    previewFileMeta: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        color: 'rgba(255,255,255,0.7)',
+        marginTop: 4,
+    },
+    previewActions: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 40,
+        paddingBottom: 40,
+    },
+    previewAction: {
+        alignItems: 'center',
+    },
+    previewActionText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_500Medium',
+        color: '#FFFFFF',
+        marginTop: 4,
+    },
+    // Folder Modal
+    folderModal: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    folderModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: COLORS.card,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    folderModalTitle: {
+        fontSize: 18,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+    },
+    folderContent: {
+        flex: 1,
+        padding: 16,
+    },
+    folderGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -4,
+    },
+    // Menu Modal
+    menuOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    menuContainer: {
+        backgroundColor: COLORS.card,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingVertical: 20,
+        paddingHorizontal: 16,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        gap: 14,
+    },
+    menuItemDanger: {
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        marginTop: 8,
+        paddingTop: 22,
+    },
+    menuText: {
+        fontSize: 16,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.text,
     },
 });
 
 export default AgentAssetsScreen;
+

@@ -30,7 +30,8 @@ const OTPInput = ({ length = 6, onComplete, error }) => {
     };
 
     const handleFocus = (index) => {
-        inputRefs.current[index]?.setNativeProps({ selection: { start: 0, end: 1 } });
+        // selectTextOnFocus prop handles text selection on focus
+        // No additional native props manipulation needed
     };
 
     return (

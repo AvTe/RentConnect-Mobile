@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native';
 import YoombaaLogo from '../../assets/yoombaa logo svg.svg';
-import { FONTS, COLORS } from '../constants/theme';
+import { COLORS } from '../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6B7280',
         marginTop: 8,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
     },
     loaderContainer: {
         marginTop: 50,
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     footerText: {
         fontSize: 12,
         color: '#D1D5DB',
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
     },
 });
 

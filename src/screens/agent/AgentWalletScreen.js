@@ -15,7 +15,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { getWalletBalance } from '../../lib/database';
 import { getWalletTransactions } from '../../lib/leadService';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -276,12 +275,12 @@ const styles = StyleSheet.create({
     },
     logoR: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
     },
     headerTitle: {
         fontSize: 20,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginLeft: 12,
     },
@@ -314,7 +313,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 14,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     scrollView: {
@@ -333,7 +332,7 @@ const styles = StyleSheet.create({
     },
     balanceLabel: {
         fontSize: 12,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
         letterSpacing: 1,
         marginBottom: 8,
@@ -344,12 +343,12 @@ const styles = StyleSheet.create({
     },
     balanceAmount: {
         fontSize: 56,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     balanceUnit: {
         fontSize: 20,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
         marginLeft: 8,
     },
@@ -389,7 +388,7 @@ const styles = StyleSheet.create({
     },
     actionLabel: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     sectionHeader: {
@@ -400,12 +399,12 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     seeAllText: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
     transactionsList: {
@@ -435,18 +434,18 @@ const styles = StyleSheet.create({
     },
     transactionTitle: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     transactionDate: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     transactionAmount: {
         fontSize: 14,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
     },
 });
 

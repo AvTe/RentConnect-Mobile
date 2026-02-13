@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
@@ -23,7 +22,6 @@ import {
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
 import { getWalletBalance } from '../../lib/database';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -448,7 +446,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     errorContainer: {
@@ -457,7 +455,7 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginTop: 16,
     },
@@ -470,7 +468,7 @@ const styles = StyleSheet.create({
     },
     backBtnText: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: '#FFFFFF',
     },
     // Header
@@ -492,7 +490,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     shareButton: {
@@ -524,12 +522,12 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         letterSpacing: 0.5,
     },
     leadId: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
     },
     // Main Card
@@ -543,13 +541,13 @@ const styles = StyleSheet.create({
     },
     lookingFor: {
         fontSize: 12,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
         marginBottom: 4,
     },
     propertyType: {
         fontSize: 24,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginBottom: 12,
     },
@@ -560,7 +558,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 15,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     divider: {
@@ -578,14 +576,14 @@ const styles = StyleSheet.create({
     },
     detailLabel: {
         fontSize: 10,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
         marginBottom: 4,
     },
     detailValue: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     // Slots Card
@@ -605,7 +603,7 @@ const styles = StyleSheet.create({
     },
     slotsTitle: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     slotsBadge: {
@@ -615,7 +613,7 @@ const styles = StyleSheet.create({
     },
     slotsBadgeText: {
         fontSize: 10,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         letterSpacing: 0.5,
     },
     slotsRow: {
@@ -642,7 +640,7 @@ const styles = StyleSheet.create({
     },
     slotsPricing: {
         fontSize: 11,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         textAlign: 'center',
     },
@@ -672,7 +670,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 20,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     tenantInfo: {
@@ -681,7 +679,7 @@ const styles = StyleSheet.create({
     },
     tenantName: {
         fontSize: 17,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     verifiedRow: {
@@ -699,7 +697,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 11,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.success,
     },
     contactInfo: {
@@ -715,7 +713,7 @@ const styles = StyleSheet.create({
     },
     contactText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     lockedInfo: {
@@ -729,7 +727,7 @@ const styles = StyleSheet.create({
     },
     lockedText: {
         fontSize: 13,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
     },
     // Notes Card
@@ -743,13 +741,13 @@ const styles = StyleSheet.create({
     },
     notesTitle: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginBottom: 8,
     },
     notesText: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         lineHeight: 20,
     },
@@ -783,7 +781,7 @@ const styles = StyleSheet.create({
     },
     callButtonText: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     whatsappButton: {
@@ -798,7 +796,7 @@ const styles = StyleSheet.create({
     },
     whatsappButtonText: {
         fontSize: 15,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: '#FFFFFF',
     },
     disabledBar: {
@@ -807,7 +805,7 @@ const styles = StyleSheet.create({
     },
     disabledText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     unlockActions: {
@@ -826,7 +824,7 @@ const styles = StyleSheet.create({
     },
     unlockButtonText: {
         fontSize: 15,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
     },
     exclusiveButton: {
@@ -843,7 +841,7 @@ const styles = StyleSheet.create({
     },
     exclusiveButtonText: {
         fontSize: 13,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
 });

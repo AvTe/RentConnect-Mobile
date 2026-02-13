@@ -7,10 +7,14 @@ import {
     TouchableOpacity,
     Switch,
     Alert,
+    Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage, availableLanguages } from '../../context/LanguageContext';
+
 
 const COLORS = {
     primary: '#FE9200',
@@ -26,16 +30,18 @@ const COLORS = {
 const SettingsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const { user, signOut } = useAuth();
+    const { colors } = useTheme();
+    const { language, t } = useLanguage();
     const [pushNotifications, setPushNotifications] = useState(true);
     const [emailNotifications, setEmailNotifications] = useState(false);
 
     const handleSignOut = () => {
         Alert.alert(
-            'Sign Out',
+            t('signOut'),
             'Are you sure you want to sign out?',
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', style: 'destructive', onPress: signOut },
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('signOut'), style: 'destructive', onPress: signOut },
             ]
         );
     };
@@ -47,9 +53,16 @@ const SettingsScreen = ({ navigation }) => {
         return 'N/A';
     };
 
+
+
+    const getCurrentLanguage = () => {
+        const lang = availableLanguages.find(l => l.code === language);
+        return lang ? `${lang.flag} ${lang.name}` : 'English';
+    };
+
     const SettingItem = ({ icon, iconColor, iconBg, title, subtitle, value, onPress, rightElement }) => (
         <TouchableOpacity
-            style={styles.settingItem}
+            style={[styles.settingItem, { backgroundColor: colors.card }]}
             onPress={onPress}
             activeOpacity={onPress ? 0.7 : 1}
             disabled={!onPress}
@@ -58,25 +71,25 @@ const SettingsScreen = ({ navigation }) => {
                 <Feather name={icon} size={18} color={iconColor} />
             </View>
             <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>{title}</Text>
-                {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+                <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+                {subtitle && <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
             </View>
-            {value && <Text style={styles.settingValue}>{value}</Text>}
+            {value && <Text style={[styles.settingValue, { color: colors.textSecondary }]}>{value}</Text>}
             {rightElement}
             {onPress && !rightElement && (
-                <Feather name="chevron-right" size={20} color={COLORS.textSecondary} />
+                <Feather name="chevron-right" size={20} color={colors.textSecondary} />
             )}
         </TouchableOpacity>
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Feather name="chevron-left" size={24} color={COLORS.text} />
+                    <Feather name="chevron-left" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Settings</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
                 <View style={styles.placeholder} />
             </View>
 
@@ -85,56 +98,69 @@ const SettingsScreen = ({ navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Language */}
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('language').toUpperCase()}</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+                    <SettingItem
+                        icon="globe"
+                        iconColor="#10B981"
+                        iconBg="#D1FAE5"
+                        title={t('language')}
+                        value={getCurrentLanguage()}
+                        onPress={() => navigation.navigate('LanguageSettings')}
+                    />
+                </View>
+
                 {/* Account Settings */}
-                <Text style={styles.sectionLabel}>ACCOUNT SETTINGS</Text>
-                <View style={styles.sectionCard}>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('accountSettings').toUpperCase()}</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
                     <SettingItem
                         icon="lock"
                         iconColor="#F59E0B"
                         iconBg="#FEF3C7"
-                        title="Password & Security"
-                        onPress={() => { }}
+                        title={t('passwordSecurity')}
+                        onPress={() => Alert.alert(t('comingSoon') || 'Coming Soon', t('featureComingSoon') || 'This feature will be available in a future update.')}
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="eye"
                         iconColor="#3B82F6"
                         iconBg="#DBEAFE"
-                        title="Privacy Settings"
-                        onPress={() => { }}
+                        title={t('privacySettings')}
+                        onPress={() => Alert.alert(t('comingSoon') || 'Coming Soon', t('featureComingSoon') || 'This feature will be available in a future update.')}
                     />
                 </View>
 
                 {/* Notifications */}
-                <Text style={styles.sectionLabel}>NOTIFICATIONS</Text>
-                <View style={styles.sectionCard}>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('notifications') || 'NOTIFICATIONS'}</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
                     <SettingItem
                         icon="bell"
                         iconColor="#8B5CF6"
                         iconBg="#EDE9FE"
-                        title="Push Notifications"
-                        subtitle="Daily updates & alerts"
+                        title={t('pushNotifications') || 'Push Notifications'}
+                        subtitle={t('dailyUpdates') || 'Daily updates & alerts'}
                         rightElement={
                             <Switch
                                 value={pushNotifications}
                                 onValueChange={setPushNotifications}
-                                trackColor={{ false: '#E5E7EB', true: COLORS.primary }}
+                                trackColor={{ false: '#E5E7EB', true: colors.primary || COLORS.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         }
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="at-sign"
                         iconColor="#EC4899"
                         iconBg="#FCE7F3"
-                        title="Email Notifications"
-                        subtitle="Weekly newsletters"
+                        title={t('emailNotifications') || 'Email Notifications'}
+                        subtitle={t('weeklyNewsletters') || 'Weekly newsletters'}
                         rightElement={
                             <Switch
                                 value={emailNotifications}
                                 onValueChange={setEmailNotifications}
-                                trackColor={{ false: '#E5E7EB', true: COLORS.primary }}
+                                trackColor={{ false: '#E5E7EB', true: colors.primary || COLORS.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         }
@@ -142,23 +168,23 @@ const SettingsScreen = ({ navigation }) => {
                 </View>
 
                 {/* App Info */}
-                <Text style={styles.sectionLabel}>APP INFO</Text>
-                <View style={styles.sectionCard}>
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('appInfo') || 'APP INFO'}</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
                     <SettingItem
                         icon="info"
                         iconColor="#6B7280"
                         iconBg="#F3F4F6"
-                        title="About Yoombaa"
+                        title={t('aboutYoombaa') || 'About Yoombaa'}
                         value="v2.4.1"
-                        onPress={() => { }}
+                        onPress={() => Alert.alert('About Yoombaa', 'Yoombaa v2.4.1\nRental marketplace connecting tenants with agents.\n\n© 2026 Yoombaa. All rights reserved.')}
                     />
-                    <View style={styles.divider} />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="file-text"
                         iconColor="#6B7280"
                         iconBg="#F3F4F6"
-                        title="Terms of Service"
-                        onPress={() => { }}
+                        title={t('termsOfService') || 'Terms of Service'}
+                        onPress={() => Linking.openURL('https://yoombaa.com/terms').catch(() => Alert.alert('Error', 'Could not open link'))}
                     />
                 </View>
 

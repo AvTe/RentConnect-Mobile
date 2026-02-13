@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabase';
-import { FONTS } from '../../constants/theme';
 
 const COLORS = {
     primary: '#FE9200',
@@ -92,10 +91,18 @@ const AgentPropertiesScreen = ({ navigation }) => {
     };
 
     const handleCall = (phone) => {
+        if (!phone) {
+            toast.warning('No phone number available for this lead');
+            return;
+        }
         Linking.openURL(`tel:${phone.replace(/\s/g, '')}`);
     };
 
     const handleMessage = (phone) => {
+        if (!phone) {
+            toast.warning('No phone number available for this lead');
+            return;
+        }
         Linking.openURL(`https://wa.me/${phone.replace(/[+\s]/g, '')}`);
     };
 
@@ -332,7 +339,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     headerIcon: {
@@ -358,7 +365,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 10,
         fontSize: 15,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.text,
     },
     sectionHeader: {
@@ -370,18 +377,18 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     sectionSubtitle: {
         fontSize: 13,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     totalCount: {
         fontSize: 14,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
     },
     filterScroll: {
@@ -407,7 +414,7 @@ const styles = StyleSheet.create({
     },
     filterTabText: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
     },
     filterTabTextActive: {
@@ -425,13 +432,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginTop: 16,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -459,7 +466,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 16,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     leadInfo: {
@@ -473,7 +480,7 @@ const styles = StyleSheet.create({
     },
     leadName: {
         fontSize: 16,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     statusRow: {
@@ -484,7 +491,7 @@ const styles = StyleSheet.create({
     },
     timeText: {
         fontSize: 12,
-        fontFamily: FONTS.regular,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
     },
     statusBadge: {
@@ -502,7 +509,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
     },
     lookingRow: {
         flexDirection: 'row',
@@ -512,18 +519,18 @@ const styles = StyleSheet.create({
     },
     lookingLabel: {
         fontSize: 11,
-        fontFamily: FONTS.bold,
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
     lookingValue: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     locationText: {
         fontSize: 13,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     phoneRow: {
@@ -536,7 +543,7 @@ const styles = StyleSheet.create({
     },
     phoneText: {
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     actionButtons: {
@@ -570,7 +577,7 @@ const styles = StyleSheet.create({
     upsellText: {
         flex: 1,
         fontSize: 14,
-        fontFamily: FONTS.medium,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
     },
     upsellButton: {
@@ -583,7 +590,7 @@ const styles = StyleSheet.create({
     },
     upsellButtonText: {
         fontSize: 13,
-        fontFamily: FONTS.semiBold,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
     },
 });
