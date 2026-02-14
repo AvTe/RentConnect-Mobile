@@ -219,6 +219,12 @@ export const hasAgentUnlockedLead = async (agentId, leadId) => {
  */
 export const addCredits = async (userId, amount, reason) => {
     try {
+        // Input validation (matches web behavior)
+        const parsedAmount = parseFloat(amount);
+        if (!userId || isNaN(parsedAmount) || parsedAmount <= 0) {
+            return { success: false, error: 'Invalid userId or amount' };
+        }
+
         const { data: user, error: getUserError } = await supabase
             .from('users')
             .select('wallet_balance')
@@ -266,6 +272,12 @@ export const addCredits = async (userId, amount, reason) => {
  */
 export const deductCredits = async (userId, amount, reason) => {
     try {
+        // Input validation
+        const parsedAmount = parseFloat(amount);
+        if (!userId || isNaN(parsedAmount) || parsedAmount <= 0) {
+            return { success: false, error: 'Invalid userId or amount' };
+        }
+
         const { data: user, error: getUserError } = await supabase
             .from('users')
             .select('wallet_balance')
@@ -404,7 +416,61 @@ export const unlockLead = async (agentId, leadId, isExclusive = false) => {
 
         if (contactError) {
             console.error('Error logging contact history:', contactError);
-            // Don't refund - the unlock was successful
+            // Refund if contact_history insert fails (matches web behavior)
+            await addCredits(agentId, cost, 'Refund: Contact history logging failed');
+            return { success: false, error: 'Failed to record unlock. Credits refunded.' };
+        }
+
+        // Step 8: Upsert lead_agent_connections (matches web unlockLead)
+        const { error: connectionError } = await supabase
+            .from('lead_agent_connections')
+            .upsert({
+                lead_id: leadId,
+                agent_id: agentId,
+                connection_type: isExclusive ? 'exclusive' : 'unlock',
+                status: 'connected',
+                cost: cost,
+                is_exclusive: isExclusive,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'lead_id,agent_id' });
+
+        if (connectionError) {
+            // Non-fatal: log but don't fail the unlock
+            console.error('Error upserting lead_agent_connections:', connectionError);
+        }
+
+        // Step 9: Create notifications (matches web unlockLead)
+        // Notify agent: "Lead unlocked"
+        try {
+            await supabase.from('notifications').insert({
+                user_id: agentId,
+                type: 'lead_unlocked',
+                title: 'Lead Unlocked!',
+                message: `You've unlocked a lead in ${lead.location || 'unknown location'}. Contact the tenant now!`,
+                data: { lead_id: leadId, cost },
+                read: false,
+                created_at: new Date().toISOString()
+            });
+        } catch (notifErr) {
+            console.error('Error creating agent notification:', notifErr);
+        }
+
+        // Notify tenant: "An agent is interested"
+        if (lead.user_id) {
+            try {
+                await supabase.from('notifications').insert({
+                    user_id: lead.user_id,
+                    type: 'agent_interested',
+                    title: 'An agent is interested!',
+                    message: 'A verified agent has unlocked your rental request and may contact you soon.',
+                    data: { lead_id: leadId, agent_id: agentId },
+                    read: false,
+                    created_at: new Date().toISOString()
+                });
+            } catch (notifErr) {
+                console.error('Error creating tenant notification:', notifErr);
+            }
         }
 
         return { success: true, cost, lead };
@@ -416,29 +482,31 @@ export const unlockLead = async (agentId, leadId, isExclusive = false) => {
 
 /**
  * Increment lead views (for analytics)
+ * Uses contact_history with contact_type='browse' to match web behavior
  */
 export const incrementLeadViews = async (leadId, agentId) => {
     try {
-        // Check if agent already viewed
+        // Check if agent already browsed this lead (via contact_history)
         const { data: existing } = await supabase
-            .from('lead_views')
+            .from('contact_history')
             .select('id')
             .eq('lead_id', leadId)
             .eq('agent_id', agentId)
+            .eq('contact_type', 'browse')
             .limit(1);
 
         if (existing && existing.length > 0) return; // Already viewed
 
-        // Log view
-        await supabase.from('lead_views').insert({
-            lead_id: leadId,
+        // Log browse in contact_history (matches web incrementLeadViews)
+        await supabase.from('contact_history').insert({
             agent_id: agentId,
+            lead_id: leadId,
+            contact_type: 'browse',
+            cost_credits: 0,
             created_at: new Date().toISOString()
         });
 
         // Increment counter on lead
-        // Fetch current views count and increment manually
-        // (supabase-js v2 does not support .raw())
         const { data: leadData } = await supabase
             .from('leads')
             .select('views')

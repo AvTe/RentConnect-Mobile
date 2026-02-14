@@ -277,6 +277,13 @@ const TenantLeadScreen = ({ navigation }) => {
             else if (propertyType === '3 Bedroom') bedrooms = 3;
             else if (propertyType === 'Studio') bedrooms = 0;
 
+            // Calculate base_price from budget tier (must match web logic)
+            let basePrice = 250; // Default: Standard
+            const budgetNum = parseFloat(budgetValue || 0);
+            if (budgetNum < 12000) basePrice = 50;        // Student/Budget
+            else if (budgetNum > 60000) basePrice = 1000;  // Premium
+            else if (budgetNum > 30000) basePrice = 450;   // Family/Mid
+
             // Prepare lead data matching the database schema
             const leadData = {
                 // Location (single field, not area/city)
@@ -294,8 +301,18 @@ const TenantLeadScreen = ({ navigation }) => {
                 tenant_email: email.trim(),
                 tenant_phone: phone.trim() || '',  // Empty string instead of null
 
-                // Status
+                // Lead pricing & slot management (aligned with web createLead)
+                base_price: basePrice,
+                views: 0,
+                contacts: 0,
+                max_slots: 3,
+                claimed_slots: 0,
+                is_exclusive: false,
+
+                // Status & timestamps
                 status: 'active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
             };
 
             // Insert into Supabase

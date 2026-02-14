@@ -231,16 +231,31 @@ export const processReferral = async (newUserId, referralCode) => {
         const REFERRER_BONUS = 5;
         const NEW_USER_BONUS = 2;
 
-        // Award credits to referrer
-        await supabase
+        // Award credits to referrer (with error check + transaction record)
+        const referrerNewBalance = (parseFloat(referrer.wallet_balance) || 0) + REFERRER_BONUS;
+        const { error: referrerUpdateError } = await supabase
             .from('users')
             .update({
-                wallet_balance: (parseFloat(referrer.wallet_balance) || 0) + REFERRER_BONUS,
+                wallet_balance: referrerNewBalance,
                 updated_at: new Date().toISOString()
             })
             .eq('id', referrerId);
 
-        // Award welcome bonus to new user
+        if (referrerUpdateError) {
+            console.error('[Referral] Error updating referrer balance:', referrerUpdateError);
+        } else {
+            // Record credit transaction for referrer
+            await supabase.from('credit_transactions').insert({
+                user_id: referrerId,
+                amount: REFERRER_BONUS,
+                type: 'credit',
+                reason: 'Referral bonus',
+                balance_after: referrerNewBalance,
+                created_at: new Date().toISOString()
+            });
+        }
+
+        // Award welcome bonus to new user (with error check + transaction record)
         const { data: newUser } = await supabase
             .from('users')
             .select('wallet_balance')
@@ -248,17 +263,32 @@ export const processReferral = async (newUserId, referralCode) => {
             .maybeSingle();
 
         if (newUser) {
-            await supabase
+            const newUserBalance = (parseFloat(newUser.wallet_balance) || 0) + NEW_USER_BONUS;
+            const { error: newUserUpdateError } = await supabase
                 .from('users')
                 .update({
-                    wallet_balance: (parseFloat(newUser.wallet_balance) || 0) + NEW_USER_BONUS,
+                    wallet_balance: newUserBalance,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', newUserId);
+
+            if (newUserUpdateError) {
+                console.error('[Referral] Error updating new user balance:', newUserUpdateError);
+            } else {
+                // Record credit transaction for new user
+                await supabase.from('credit_transactions').insert({
+                    user_id: newUserId,
+                    amount: NEW_USER_BONUS,
+                    type: 'credit',
+                    reason: 'Welcome bonus (referral)',
+                    balance_after: newUserBalance,
+                    created_at: new Date().toISOString()
+                });
+            }
         }
 
-        // Record referral
-        await supabase.from('referrals').insert({
+        // Record referral (with error check)
+        const { error: referralInsertError } = await supabase.from('referrals').insert({
             referrer_id: referrerId,
             referred_user_id: newUserId,
             credits_awarded: REFERRER_BONUS,
@@ -267,6 +297,10 @@ export const processReferral = async (newUserId, referralCode) => {
             completed_at: new Date().toISOString(),
             created_at: new Date().toISOString()
         });
+
+        if (referralInsertError) {
+            console.error('[Referral] Error recording referral:', referralInsertError);
+        }
 
         logger.log('[Referral] Successfully processed referral');
         return { success: true, referrerName: referrer.name };

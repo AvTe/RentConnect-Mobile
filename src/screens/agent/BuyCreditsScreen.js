@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
+import { addCredits } from '../../lib/leadService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -176,34 +177,16 @@ const BuyCreditsScreen = ({ navigation, route }) => {
                         }
                     }
 
-                    // Add credits to wallet
-                    const { data: currentUser } = await supabase
-                        .from('users')
-                        .select('wallet_balance')
-                        .eq('id', user.id)
-                        .single();
+                    // Add credits to wallet using shared service function
+                    const creditResult = await addCredits(
+                        user.id,
+                        selectedBundle.credits,
+                        `Purchased ${selectedBundle.name} bundle - KSh ${selectedBundle.price}`
+                    );
 
-                    const newBalance = (currentUser?.wallet_balance || 0) + selectedBundle.credits;
-
-                    await supabase
-                        .from('users')
-                        .update({
-                            wallet_balance: newBalance,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', user.id);
-
-                    // Record transaction
-                    await supabase
-                        .from('credit_transactions')
-                        .insert({
-                            user_id: user.id,
-                            amount: selectedBundle.credits,
-                            type: 'credit',
-                            reason: `Purchased ${selectedBundle.name} bundle - KSh ${selectedBundle.price}`,
-                            balance_after: newBalance,
-                            created_at: new Date().toISOString(),
-                        });
+                    if (!creditResult.success) {
+                        throw new Error(creditResult.error || 'Failed to add credits');
+                    }
 
                     // Update payment status
                     if (payment?.id) {
