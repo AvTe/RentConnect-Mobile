@@ -13,12 +13,13 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { supabase } from '../../lib/supabase';
 import {
     calculateUnlockCost,
     calculateExclusiveCost,
     getLeadState,
     unlockLead,
+    getLead,
+    hasAgentUnlockedLead,
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
 import { getWalletBalance } from '../../lib/database';
@@ -59,27 +60,17 @@ const LeadDetailScreen = ({ route, navigation }) => {
         }
 
         try {
-            // Fetch lead details
-            const { data: leadData, error: leadError } = await supabase
-                .from('leads')
-                .select('*')
-                .eq('id', leadId)
-                .single();
+            // Fetch lead details via service layer
+            const leadResult = await getLead(leadId);
 
-            if (leadError) throw leadError;
+            if (!leadResult.success) throw new Error(leadResult.error);
 
-            setLead(leadData);
+            setLead(leadResult.data);
 
-            // Check if unlocked
-            const { data: unlockedData } = await supabase
-                .from('contact_history')
-                .select('id')
-                .eq('agent_id', user.id)
-                .eq('lead_id', leadId)
-                .in('contact_type', ['unlock', 'exclusive'])
-                .single();
+            // Check if unlocked via service layer
+            const unlocked = await hasAgentUnlockedLead(user.id, leadId);
 
-            setIsUnlocked(!!unlockedData);
+            setIsUnlocked(!!unlocked);
 
             // Fetch credit balance
             const balanceResult = await getWalletBalance(user.id);
@@ -367,6 +358,17 @@ const LeadDetailScreen = ({ route, navigation }) => {
                         <Text style={styles.notesTitle}>Additional Notes</Text>
                         <Text style={styles.notesText}>{lead.requirements.notes}</Text>
                     </View>
+                )}
+
+                {/* Report Bad Lead */}
+                {isUnlocked && (
+                    <TouchableOpacity
+                        style={styles.reportBadLeadBtn}
+                        onPress={() => navigation.navigate('BadLeadReport', { leadId: lead.id, leadTitle: lead.name || lead.tenant_name })}
+                    >
+                        <Feather name="flag" size={16} color="#EF4444" />
+                        <Text style={styles.reportBadLeadText}>Report Bad Lead</Text>
+                    </TouchableOpacity>
                 )}
 
                 <View style={{ height: 120 }} />
@@ -750,6 +752,23 @@ const styles = StyleSheet.create({
         fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         lineHeight: 20,
+    },
+    reportBadLeadBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
+        backgroundColor: '#FEF2F2',
+        gap: 8,
+        marginBottom: 16,
+    },
+    reportBadLeadText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_500Medium',
+        color: '#EF4444',
     },
     // Bottom Bar
     bottomBar: {

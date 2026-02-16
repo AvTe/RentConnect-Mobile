@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { getTenantLeads } from '../../lib/leadService';
 import YoombaaLogo from '../../../assets/yoombaa logo svg.svg';
 
 const { width } = Dimensions.get('window');
@@ -92,14 +92,10 @@ const TenantDashboardScreen = ({ navigation }) => {
 
     const fetchData = useCallback(async () => {
         try {
-            const { data: leads, error } = await supabase
-                .from('leads')
-                .select('*')
-                .eq('tenant_email', user?.email)
-                .order('created_at', { ascending: false })
-                .limit(3);
+            const result = await getTenantLeads(user?.email, { limit: 3 });
 
-            if (leads) {
+            if (result.success && result.data) {
+                const leads = result.data;
                 setRecentRequests(leads);
                 const activeCount = leads.filter(l => l.status === 'active').length;
                 const totalViews = leads.reduce((sum, l) => sum + (l.views || 0), 0);
@@ -325,6 +321,22 @@ const TenantDashboardScreen = ({ navigation }) => {
                         </View>
                     </Animated.View>
                 </Animated.View>
+
+                {/* Browse Agents CTA */}
+                <TouchableOpacity
+                    style={styles.browseAgentsCta}
+                    onPress={() => navigation.navigate('AgentBrowse')}
+                    activeOpacity={0.85}
+                >
+                    <View style={styles.browseAgentsIcon}>
+                        <Feather name="search" size={20} color={COLORS.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.browseAgentsTitle}>Find an Agent</Text>
+                        <Text style={styles.browseAgentsSubtitle}>Browse verified agents in your area</Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
 
                 {/* My Requests Section */}
                 <View style={styles.sectionHeader}>
@@ -597,6 +609,37 @@ const styles = StyleSheet.create({
         fontSize: 9,
         color: COLORS.primary,
         fontWeight: '600',
+    },
+    // Browse Agents CTA
+    browseAgentsCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.primaryLight || '#FFF5E6',
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '30',
+        gap: 12,
+    },
+    browseAgentsIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    browseAgentsTitle: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+    },
+    browseAgentsSubtitle: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 2,
     },
     // Section Header
     sectionHeader: {

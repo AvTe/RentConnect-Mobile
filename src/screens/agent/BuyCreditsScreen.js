@@ -17,7 +17,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
-import { addCredits } from '../../lib/leadService';
+import { addAgentCredits } from '../../lib/leadService';
+import { processReferralOnFirstPurchase } from '../../lib/database';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -177,11 +178,16 @@ const BuyCreditsScreen = ({ navigation, route }) => {
                         }
                     }
 
-                    // Add credits to wallet using shared service function
-                    const creditResult = await addCredits(
+                    // Add credits to wallet using shared service (sends notification)
+                    const creditResult = await addAgentCredits(
                         user.id,
                         selectedBundle.credits,
-                        `Purchased ${selectedBundle.name} bundle - KSh ${selectedBundle.price}`
+                        {
+                            paymentMethod: 'M-Pesa',
+                            amount: selectedBundle.price,
+                            confirmationCode: payment?.id || '',
+                            transactionId: payment?.id,
+                        }
                     );
 
                     if (!creditResult.success) {
@@ -194,6 +200,13 @@ const BuyCreditsScreen = ({ navigation, route }) => {
                             .from('payment_transactions')
                             .update({ status: 'completed' })
                             .eq('id', payment.id);
+                    }
+
+                    // Process two-stage referral bonus on first purchase (matches web)
+                    try {
+                        await processReferralOnFirstPurchase(user.id);
+                    } catch (refErr) {
+                        console.error('Non-critical referral processing error:', refErr);
                     }
 
                     toast.success(`${selectedBundle.credits} credits added to your wallet!`);

@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { supabase } from '../../lib/supabase';
+import { updateUser } from '../../lib/database';
 
 const COLORS = {
     primary: '#FE9200',
@@ -109,15 +109,11 @@ const AgentProfileEditScreen = ({ navigation }) => {
                 bio: formData.bio.trim(),
                 experience: formData.experience ? parseInt(formData.experience) : null,
                 specialization: formData.specialization.trim(),
-                updated_at: new Date().toISOString(),
             };
 
-            const { error } = await supabase
-                .from('users')
-                .update(updateData)
-                .eq('id', user.id);
+            const result = await updateUser(user.id, updateData);
 
-            if (error) throw error;
+            if (!result.success) throw new Error(result.error);
 
             // Refresh user data
             if (refreshUserData) {

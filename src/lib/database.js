@@ -389,3 +389,73 @@ export const getReferralCode = async (userId) => {
         return { success: false, error: error.message };
     }
 };
+
+/**
+ * Process referral bonus on agent's first purchase (two-stage referral).
+ * Matches web: processReferralOnFirstPurchase in database.js
+ *
+ * If the user was referred and the referral is still 'pending',
+ * this awards the referrer bonus credits and marks it completed.
+ */
+export const processReferralOnFirstPurchase = async (userId) => {
+    try {
+        // Check if user has a pending referral
+        const { data: pendingReferral, error: fetchError } = await supabase
+            .from('referrals')
+            .select('id, referrer_id, bonus_amount')
+            .eq('referred_user_id', userId)
+            .eq('status', 'pending')
+            .maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        if (!pendingReferral) {
+            return { success: true, bonusAwarded: 0 }; // No pending referral
+        }
+
+        const bonusAmount = pendingReferral.bonus_amount || 5;
+
+        // Award credits to referrer
+        const { addCredits } = require('./leadService');
+        const creditResult = await addCredits(
+            pendingReferral.referrer_id,
+            bonusAmount,
+            'Referral Bonus: Agent made first purchase'
+        );
+
+        if (!creditResult.success) {
+            console.error('Failed to award referral bonus:', creditResult.error);
+            return { success: false, error: creditResult.error };
+        }
+
+        // Update referral status to completed
+        await supabase
+            .from('referrals')
+            .update({
+                status: 'completed',
+                credits_awarded: bonusAmount,
+                completed_at: new Date().toISOString(),
+            })
+            .eq('id', pendingReferral.id);
+
+        // Notify the referrer
+        await supabase.from('notifications').insert({
+            user_id: pendingReferral.referrer_id,
+            type: 'referral_bonus',
+            title: 'Referral Bonus Earned!',
+            message: `Your referred agent just made their first purchase! ${bonusAmount} credits have been added to your wallet.`,
+            data: { bonusAmount, referredUserId: userId },
+            read: false,
+            created_at: new Date().toISOString(),
+        });
+
+        return {
+            success: true,
+            bonusAwarded: bonusAmount,
+            referrerId: pendingReferral.referrer_id,
+        };
+    } catch (error) {
+        console.error('Error processing referral bonus:', error);
+        return { success: false, error: error.message };
+    }
+};

@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { supabase } from '../../lib/supabase';
+import { getAgentUnlockedLeads } from '../../lib/leadService';
 
 const COLORS = {
     primary: '#FE9200',
@@ -48,21 +48,12 @@ const AgentPropertiesScreen = ({ navigation }) => {
         if (!user?.id) return;
 
         try {
-            // Use contact_history table to get unlocked leads
-            const { data, error, count } = await supabase
-                .from('contact_history')
-                .select(`
-                    *,
-                    leads (*)
-                `, { count: 'exact' })
-                .eq('agent_id', user.id)
-                .in('contact_type', ['unlock', 'exclusive'])
-                .order('created_at', { ascending: false });
+            const result = await getAgentUnlockedLeads(user.id);
 
-            if (error) throw error;
+            if (!result.success) throw new Error(result.error);
 
             // Transform data to match expected format
-            const transformedData = (data || []).map(item => ({
+            const transformedData = (result.data || []).map(item => ({
                 id: item.id,
                 status: item.status || 'pending',
                 contacted_at: item.created_at,
@@ -70,7 +61,7 @@ const AgentPropertiesScreen = ({ navigation }) => {
             }));
 
             setConnectedLeads(transformedData);
-            setTotalCount(count || transformedData.length);
+            setTotalCount(transformedData.length);
         } catch (error) {
             console.error('Error fetching connected leads:', error);
             setConnectedLeads([]);
@@ -224,8 +215,29 @@ const AgentPropertiesScreen = ({ navigation }) => {
                     <Feather name="arrow-left" size={22} color={COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Properties</Text>
-                <TouchableOpacity style={styles.headerIcon}>
-                    <Feather name="bell" size={22} color={COLORS.text} />
+                <TouchableOpacity
+                    style={styles.headerIcon}
+                    onPress={() => navigation.navigate('PropertyList')}
+                >
+                    <Feather name="list" size={22} color={COLORS.text} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Quick Actions */}
+            <View style={styles.quickActionsRow}>
+                <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    onPress={() => navigation.navigate('CreateProperty')}
+                >
+                    <Feather name="plus" size={16} color={COLORS.primary} />
+                    <Text style={styles.quickActionText}>Add Property</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    onPress={() => navigation.navigate('PropertyList')}
+                >
+                    <Feather name="home" size={16} color={COLORS.primary} />
+                    <Text style={styles.quickActionText}>My Listings</Text>
                 </TouchableOpacity>
             </View>
 
@@ -300,7 +312,7 @@ const AgentPropertiesScreen = ({ navigation }) => {
                     <Text style={styles.upsellText}>Need More Credits?</Text>
                     <TouchableOpacity
                         style={styles.upsellButton}
-                        onPress={() => toast.info('View plans coming soon')}
+                        onPress={() => navigation.navigate('Subscription')}
                     >
                         <Text style={styles.upsellButtonText}>View New Plans</Text>
                     </TouchableOpacity>
@@ -347,6 +359,29 @@ const styles = StyleSheet.create({
         height: 40,
         justifyContent: 'center',
         alignItems: 'flex-end',
+    },
+    quickActionsRow: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        gap: 10,
+    },
+    quickActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFF5E6',
+        borderRadius: 30,
+        paddingVertical: 10,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#FE920030',
+    },
+    quickActionText: {
+        fontSize: 13,
+        fontFamily: 'DMSans_600SemiBold',
+        color: '#FE9200',
     },
     searchContainer: {
         flexDirection: 'row',

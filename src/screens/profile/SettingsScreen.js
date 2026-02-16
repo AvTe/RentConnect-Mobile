@@ -186,6 +186,14 @@ const SettingsScreen = ({ navigation }) => {
                         title={t('termsOfService') || 'Terms of Service'}
                         onPress={() => Linking.openURL('https://yoombaa.com/terms').catch(() => Alert.alert('Error', 'Could not open link'))}
                     />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    <SettingItem
+                        icon="message-circle"
+                        iconColor="#10B981"
+                        iconBg="#D1FAE5"
+                        title="My Support Tickets"
+                        onPress={() => navigation.navigate('TicketList')}
+                    />
                 </View>
 
                 {/* Help Card */}

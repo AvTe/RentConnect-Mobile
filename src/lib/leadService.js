@@ -569,3 +569,228 @@ export const getWalletTransactions = async (userId, limit = 20) => {
         return { success: false, transactions: [], error: error.message };
     }
 };
+
+// ============================================
+// LEAD CREATION (matches web createLead)
+// ============================================
+
+/**
+ * Create a new lead with proper pricing & agent notifications.
+ * Matches web: createLead in database.js
+ */
+export const createLead = async (leadData) => {
+    try {
+        // Calculate base_price from budget tier (matches web logic)
+        let basePrice = 250; // Default: Standard
+        const budget = parseFloat(leadData.budget || 0);
+        if (budget < 12000) basePrice = 50;       // Student/Budget
+        else if (budget > 60000) basePrice = 1000; // Premium
+        else if (budget > 30000) basePrice = 450;  // Family/Mid
+
+        const { data, error } = await supabase
+            .from('leads')
+            .insert({
+                ...leadData,
+                status: 'active',
+                views: 0,
+                contacts: 0,
+                base_price: basePrice,
+                max_slots: 3,
+                claimed_slots: 0,
+                is_exclusive: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // --- NOTIFICATION LOGIC (matches web createLead) ---
+        try {
+            // Find all verified agents
+            const { data: allAgents } = await supabase
+                .from('users')
+                .select('id, name, location')
+                .eq('role', 'agent')
+                .eq('verification_status', 'verified');
+
+            if (allAgents && allAgents.length > 0) {
+                const leadLoc = (leadData.location || '').toLowerCase();
+                const leadType = leadData.property_type || 'property';
+
+                // Filter agents where locations overlap (or generalist agents)
+                const matchingAgents = allAgents.filter(agent => {
+                    const agentLoc = (agent.location || '').toLowerCase();
+                    if (!agentLoc || agentLoc === 'all' || agentLoc === 'global' || agentLoc === 'any') return true;
+                    return leadLoc.includes(agentLoc) || agentLoc.includes(leadLoc);
+                });
+
+                if (matchingAgents.length > 0) {
+                    // Create in-app notifications for each matching agent
+                    const notifications = matchingAgents.map(agent => ({
+                        user_id: agent.id,
+                        type: 'new_lead',
+                        title: 'New Lead Available!',
+                        message: `A new tenant is looking for ${leadType} in ${leadData.location}`,
+                        data: {
+                            leadId: data.id,
+                            location: leadData.location,
+                            type: leadType,
+                            budget: leadData.budget,
+                        },
+                        read: false,
+                        created_at: new Date().toISOString(),
+                    }));
+
+                    await supabase.from('notifications').insert(notifications);
+                }
+            }
+        } catch (notifErr) {
+            console.error('Non-critical error sending lead notifications:', notifErr);
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error creating lead:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Get a single lead by ID
+ */
+export const getLead = async (leadId) => {
+    try {
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .single();
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error fetching lead:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Get tenant's leads by email
+ */
+export const getTenantLeads = async (tenantEmail, options = {}) => {
+    try {
+        let query = supabase
+            .from('leads')
+            .select('*')
+            .eq('tenant_email', tenantEmail)
+            .order('created_at', { ascending: false });
+
+        if (options.limit) {
+            query = query.limit(options.limit);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return { success: true, data: data || [] };
+    } catch (error) {
+        console.error('Error fetching tenant leads:', error);
+        return { success: false, data: [], error: error.message };
+    }
+};
+
+/**
+ * Update a lead's status
+ */
+export const updateLeadStatus = async (leadId, status) => {
+    try {
+        const { error } = await supabase
+            .from('leads')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', leadId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating lead status:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Delete a lead
+ */
+export const deleteLead = async (leadId) => {
+    try {
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', leadId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting lead:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Add credits to agent wallet with notification (matches web addAgentCredits).
+ * Wraps addCredits() and sends a purchase notification.
+ */
+export const addAgentCredits = async (agentId, credits, transactionData = {}) => {
+    const reason = `Credit purchase via ${transactionData.paymentMethod || 'Payment'} - ${transactionData.confirmationCode || ''}`;
+    const result = await addCredits(agentId, credits, reason);
+
+    if (result.success) {
+        // Send in-app notification on credit purchase
+        try {
+            await supabase.from('notifications').insert({
+                user_id: agentId,
+                type: 'credits_purchased',
+                title: 'Credits Added!',
+                message: `${credits} credits have been added to your wallet. New balance: ${result.newBalance} credits.`,
+                data: {
+                    credits,
+                    amount: transactionData.amount || 0,
+                    newBalance: result.newBalance,
+                    transactionId: transactionData.confirmationCode || transactionData.transactionId,
+                },
+                read: false,
+                created_at: new Date().toISOString(),
+            });
+        } catch (notifError) {
+            console.error('Non-critical notification error:', notifError);
+        }
+    }
+
+    return result;
+};
+
+/**
+ * Subscribe to real-time lead updates
+ * Matches web: subscribeToLeads in database.js
+ */
+export const subscribeToLeads = (filters = {}, callback) => {
+    const channel = supabase
+        .channel('leads-realtime')
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'leads'
+            },
+            (payload) => {
+                callback(payload);
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+};

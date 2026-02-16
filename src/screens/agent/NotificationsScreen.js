@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { supabase } from '../../lib/supabase';
+import { getUserNotifications, markNotificationRead, markAllNotificationsRead } from '../../lib/notificationService';
 
 const COLORS = {
     primary: '#FE9200',
@@ -61,22 +61,12 @@ const NotificationsScreen = ({ navigation }) => {
         }
 
         try {
-            let query = supabase
-                .from('notifications')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(50);
+            const includeRead = filter !== 'unread';
+            const result = await getUserNotifications(user.id, includeRead);
 
-            if (filter === 'unread') {
-                query = query.eq('read', false);
-            }
+            if (!result.success) throw new Error(result.error);
 
-            const { data, error } = await query;
-
-            if (error) throw error;
-
-            setNotifications(data || []);
+            setNotifications(result.data || []);
         } catch (error) {
             console.error('Error fetching notifications:', error);
             // Demo notifications
@@ -139,10 +129,7 @@ const NotificationsScreen = ({ navigation }) => {
 
     const markAsRead = async (notificationId) => {
         try {
-            await supabase
-                .from('notifications')
-                .update({ read: true })
-                .eq('id', notificationId);
+            await markNotificationRead(notificationId);
 
             setNotifications(prev =>
                 prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
@@ -154,11 +141,7 @@ const NotificationsScreen = ({ navigation }) => {
 
     const markAllAsRead = async () => {
         try {
-            await supabase
-                .from('notifications')
-                .update({ read: true })
-                .eq('user_id', user.id)
-                .eq('read', false);
+            await markAllNotificationsRead(user.id);
 
             setNotifications(prev =>
                 prev.map(n => ({ ...n, read: true }))

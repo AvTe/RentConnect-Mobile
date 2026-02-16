@@ -131,13 +131,21 @@ const SupportScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 ))}
 
-                {/* Create Ticket Button */}
+                {/* Ticket Buttons */}
                 <TouchableOpacity
                     style={styles.ticketBtn}
-                    onPress={() => Alert.alert('Coming Soon', 'Support ticket creation will be available in a future update.')}
+                    onPress={() => navigation.navigate('TicketList')}
                 >
-                    <Feather name="plus" size={20} color="#FFFFFF" />
-                    <Text style={styles.ticketBtnText}>Create Support Ticket</Text>
+                    <Feather name="list" size={20} color="#FFFFFF" />
+                    <Text style={styles.ticketBtnText}>View My Tickets</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.ticketBtn, { backgroundColor: COLORS.primaryLight, marginTop: 10 }]}
+                    onPress={() => navigation.navigate('CreateTicket')}
+                >
+                    <Feather name="plus" size={20} color={COLORS.primary} />
+                    <Text style={[styles.ticketBtnText, { color: COLORS.primary }]}>Create Support Ticket</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 40 }} />

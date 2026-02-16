@@ -173,6 +173,41 @@ const AgentAccountScreen = ({ navigation }) => {
                     />
                 </View>
 
+                {/* Menu Section - Business */}
+                <View style={styles.menuSection}>
+                    <MenuItem
+                        icon="credit-card"
+                        iconBg="#FFF5E6"
+                        iconColor="#FE9200"
+                        title="Subscription & Plans"
+                        onPress={() => navigation.navigate('Subscription')}
+                    />
+                    <View style={styles.menuDivider} />
+                    <MenuItem
+                        icon="gift"
+                        iconBg="#EDE9FE"
+                        iconColor="#8B5CF6"
+                        title="My Vouchers"
+                        onPress={() => navigation.navigate('Vouchers')}
+                    />
+                    <View style={styles.menuDivider} />
+                    <MenuItem
+                        icon="star"
+                        iconBg="#FEF3C7"
+                        iconColor="#F59E0B"
+                        title="My Ratings & Reviews"
+                        onPress={() => navigation.navigate('AgentRatings', { agentId: user?.id })}
+                    />
+                    <View style={styles.menuDivider} />
+                    <MenuItem
+                        icon="home"
+                        iconBg="#DBEAFE"
+                        iconColor="#3B82F6"
+                        title="Property Listings"
+                        onPress={() => navigation.navigate('PropertyList')}
+                    />
+                </View>
+
                 {/* Menu Section 2 - Settings */}
                 <View style={styles.menuSection}>
                     <MenuItem
@@ -201,6 +236,14 @@ const AgentAccountScreen = ({ navigation }) => {
                         title="Support"
                         isExternal
                         onPress={() => navigation.navigate('Support')}
+                    />
+                    <View style={styles.menuDivider} />
+                    <MenuItem
+                        icon="message-circle"
+                        iconBg="#D1FAE5"
+                        iconColor="#10B981"
+                        title="My Support Tickets"
+                        onPress={() => navigation.navigate('TicketList')}
                     />
                 </View>
 

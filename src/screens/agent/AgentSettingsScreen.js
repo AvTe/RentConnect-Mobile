@@ -197,6 +197,22 @@ const AgentSettingsScreen = ({ navigation }) => {
                         title="Help & Support"
                         onPress={() => navigation.navigate('Support')}
                     />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    <SettingItem
+                        icon="message-circle"
+                        iconBg="#D1FAE5"
+                        iconColor="#10B981"
+                        title="My Support Tickets"
+                        onPress={() => navigation.navigate('TicketList')}
+                    />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    <SettingItem
+                        icon="credit-card"
+                        iconBg="#FFF5E6"
+                        iconColor="#FE9200"
+                        title="Subscription & Plans"
+                        onPress={() => navigation.navigate('Subscription')}
+                    />
                 </View>
 
                 {/* Sign Out Button */}

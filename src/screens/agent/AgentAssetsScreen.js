@@ -21,14 +21,90 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Video, ResizeMode } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
 
+const STORAGE_BUCKET = 'agent-assets';
+
+/**
+ * Generate a share token (matches web implementation)
+ * 12 chars, alphanumeric, excluding ambiguous chars (0, O, 1, l, I)
+ */
+const generateShareToken = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let token = '';
+    for (let i = 0; i < 12; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+};
+
+/**
+ * Get usable URL for an asset.
+ * Tries: public_url → storage_path (generate public URL) → file_url → null
+ */
+const getAssetUrl = (asset) => {
+    if (asset.public_url && asset.public_url.startsWith('http')) return asset.public_url;
+    if (asset.storage_path) {
+        const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(asset.storage_path);
+        if (data?.publicUrl) return data.publicUrl;
+    }
+    // Legacy fallback — old records might have file_url with an http URL
+    if (asset.file_url && asset.file_url.startsWith('http')) return asset.file_url;
+    return null;
+};
+
+/**
+ * Normalize a DB asset row so the rest of the screen can use .file_url consistently.
+ */
+const normalizeAsset = (row) => ({
+    ...row,
+    file_url: getAssetUrl(row),
+    file_type: row.mime_type || row.file_type || '',
+});
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Thumbnail component with error fallback — defined outside to avoid remounting
+const SafeImage = ({ uri, style, fallbackIcon, fallbackColor, fallbackBg, resizeMode = 'cover' }) => {
+    const [failed, setFailed] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        setFailed(false);
+        setIsLoading(true);
+    }, [uri]);
+
+    if (!uri || failed) {
+        return (
+            <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: fallbackBg || '#DBEAFE' }]}>
+                <Feather name={fallbackIcon || 'image'} size={32} color={fallbackColor || '#3B82F6'} />
+            </View>
+        );
+    }
+
+    return (
+        <View style={style}>
+            <Image
+                source={{ uri }}
+                style={{ width: '100%', height: '100%', borderRadius: style?.borderRadius || 0 }}
+                resizeMode={resizeMode}
+                onLoad={() => setIsLoading(false)}
+                onError={() => setFailed(true)}
+            />
+            {isLoading && (
+                <View style={{ ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: fallbackBg || '#DBEAFE' }}>
+                    <ActivityIndicator size="small" color={fallbackColor || '#3B82F6'} />
+                </View>
+            )}
+        </View>
+    );
+};
 
 const COLORS = {
     primary: '#FE9200',
@@ -64,7 +140,7 @@ const AgentAssetsScreen = ({ navigation }) => {
 
     // Data states
     const [assets, setAssets] = useState([]);
-    const [properties, setProperties] = useState([]);
+    const [folders, setFolders] = useState([]);
     const [storageUsage, setStorageUsage] = useState({
         totalUsed: 0,
         limit: 50 * 1024 * 1024,
@@ -80,6 +156,30 @@ const AgentAssetsScreen = ({ navigation }) => {
     const [selectedFolder, setSelectedFolder] = useState(null);
     const [menuModalVisible, setMenuModalVisible] = useState(false);
     const [menuTarget, setMenuTarget] = useState(null);
+
+    // Folder management modal states
+    const [createFolderVisible, setCreateFolderVisible] = useState(false);
+    const [editFolderVisible, setEditFolderVisible] = useState(false);
+    const [editingFolder, setEditingFolder] = useState(null);
+    const [folderForm, setFolderForm] = useState({ name: '', location: '', description: '' });
+    const [folderSaving, setFolderSaving] = useState(false);
+
+    // Move file to folder modal states
+    const [moveFileVisible, setMoveFileVisible] = useState(false);
+    const [movingAsset, setMovingAsset] = useState(null);
+    const [movingToFolderId, setMovingToFolderId] = useState(null);
+
+    // Media preview states
+    const [mediaLoading, setMediaLoading] = useState(true);
+    const [mediaError, setMediaError] = useState(false);
+
+    // Reset media states when selected asset changes
+    useEffect(() => {
+        if (selectedAsset) {
+            setMediaLoading(true);
+            setMediaError(false);
+        }
+    }, [selectedAsset]);
 
     // Helper functions
     const formatBytes = (bytes) => {
@@ -140,7 +240,7 @@ const AgentAssetsScreen = ({ navigation }) => {
         }
     };
 
-    // Fetch assets from Supabase
+    // Fetch folders and assets from Supabase
     const fetchAssets = useCallback(async () => {
         if (!user?.id) {
             setLoading(false);
@@ -148,6 +248,21 @@ const AgentAssetsScreen = ({ navigation }) => {
         }
 
         try {
+            // Fetch folders with asset count (matches web: getAgentFolders)
+            const { data: foldersData, error: foldersError } = await supabase
+                .from('agent_asset_folders')
+                .select('*, assets:agent_assets(count)')
+                .eq('agent_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (!foldersError && foldersData) {
+                const foldersWithCount = foldersData.map(f => ({
+                    ...f,
+                    assetCount: f.assets?.[0]?.count || 0,
+                }));
+                setFolders(foldersWithCount);
+            }
+
             // Fetch all assets for this agent
             const { data: assetsData, error: assetsError } = await supabase
                 .from('agent_assets')
@@ -160,7 +275,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                 throw assetsError;
             }
 
-            const assetsList = assetsData || [];
+            const assetsList = (assetsData || []).map(normalizeAsset);
 
             // Calculate storage usage
             const totalUsed = assetsList.reduce((sum, asset) => sum + (asset.file_size || 0), 0);
@@ -178,110 +293,10 @@ const AgentAssetsScreen = ({ navigation }) => {
                 documentCount,
             });
 
-            // Group assets by property/folder
-            const propertyMap = {};
-            assetsList.forEach(asset => {
-                const propName = asset.property_name || asset.folder_name || 'Uncategorized';
-                if (!propertyMap[propName]) {
-                    propertyMap[propName] = {
-                        id: propName,
-                        name: propName,
-                        location: asset.property_location || asset.location || '',
-                        assets: [],
-                        thumbnail: null,
-                    };
-                }
-                propertyMap[propName].assets.push(asset);
-                // Set first image as thumbnail
-                if (!propertyMap[propName].thumbnail && getFileType(asset.file_type, asset.file_name) === 'image') {
-                    propertyMap[propName].thumbnail = asset.file_url;
-                }
-            });
-
-            setProperties(Object.values(propertyMap));
             setAssets(assetsList);
 
         } catch (error) {
             console.error('Error fetching assets:', error);
-            // Use demo data on error
-            const demoAssets = [
-                {
-                    id: '1',
-                    file_name: 'Living_Room_View_01.jpg',
-                    property_name: 'Meru Luxury Houses',
-                    location: 'Meru',
-                    file_size: 2.4 * 1024 * 1024,
-                    file_type: 'image/jpeg',
-                    file_url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
-                    created_at: new Date().toISOString(),
-                },
-                {
-                    id: '2',
-                    file_name: 'Master_Bedroom.jpg',
-                    property_name: 'Meru Luxury Houses',
-                    location: 'Meru',
-                    file_size: 1.8 * 1024 * 1024,
-                    file_type: 'image/jpeg',
-                    file_url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800',
-                    created_at: new Date().toISOString(),
-                },
-                {
-                    id: '3',
-                    file_name: 'Apartment_Tour.mp4',
-                    property_name: 'Nairobi Apartments 32B',
-                    location: 'Nairobi',
-                    file_size: 15 * 1024 * 1024,
-                    file_type: 'video/mp4',
-                    file_url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-                    created_at: new Date().toISOString(),
-                },
-                {
-                    id: '4',
-                    file_name: 'Lease_Agreement.pdf',
-                    property_name: 'Nairobi Apartments 32B',
-                    location: 'Nairobi',
-                    file_size: 1.1 * 1024 * 1024,
-                    file_type: 'application/pdf',
-                    file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', // FIXME: Replace with actual document URL from Supabase storage
-                    created_at: new Date().toISOString(),
-                },
-                {
-                    id: '5',
-                    file_name: 'Kitchen_Photo.jpg',
-                    property_name: 'Nairobi Apartments 32B',
-                    location: 'Nairobi',
-                    file_size: 2.0 * 1024 * 1024,
-                    file_type: 'image/jpeg',
-                    file_url: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800',
-                    created_at: new Date().toISOString(),
-                },
-            ];
-
-            setAssets(demoAssets);
-
-            // Calculate from demo data
-            const totalUsed = demoAssets.reduce((sum, a) => sum + (a.file_size || 0), 0);
-            setStorageUsage({
-                totalUsed,
-                limit: 50 * 1024 * 1024,
-                imageCount: demoAssets.filter(a => getFileType(a.file_type, a.file_name) === 'image').length,
-                videoCount: demoAssets.filter(a => getFileType(a.file_type, a.file_name) === 'video').length,
-                documentCount: demoAssets.filter(a => !['image', 'video'].includes(getFileType(a.file_type, a.file_name))).length,
-            });
-
-            // Group demo assets
-            const propMap = {};
-            demoAssets.forEach(asset => {
-                const name = asset.property_name || 'Uncategorized';
-                if (!propMap[name]) {
-                    propMap[name] = { id: name, name, location: asset.location || '', assets: [], thumbnail: null };
-                }
-                propMap[name].assets.push(asset);
-                if (!propMap[name].thumbnail && getFileType(asset.file_type, asset.file_name) === 'image') {
-                    propMap[name].thumbnail = asset.file_url;
-                }
-            });
-            setProperties(Object.values(propMap));
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -295,6 +310,215 @@ const AgentAssetsScreen = ({ navigation }) => {
     const onRefresh = () => {
         setRefreshing(true);
         fetchAssets();
+    };
+
+    // =============================================
+    // FOLDER CRUD OPERATIONS (matches web lib/assets.js)
+    // =============================================
+
+    const handleCreateFolder = async () => {
+        if (!folderForm.name.trim()) {
+            toast.error('Please enter a folder name');
+            return;
+        }
+        setFolderSaving(true);
+        try {
+            const shareToken = generateShareToken();
+            const { data, error } = await supabase
+                .from('agent_asset_folders')
+                .insert({
+                    agent_id: user.id,
+                    name: folderForm.name.trim(),
+                    location: folderForm.location.trim() || null,
+                    description: folderForm.description.trim() || null,
+                    share_token: shareToken,
+                    is_shared: false,
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            setFolders(prev => [{ ...data, assetCount: 0 }, ...prev]);
+            setCreateFolderVisible(false);
+            setFolderForm({ name: '', location: '', description: '' });
+            toast.success('Folder created!');
+        } catch (error) {
+            console.error('Create folder error:', error);
+            toast.error('Failed to create folder');
+        } finally {
+            setFolderSaving(false);
+        }
+    };
+
+    const handleEditFolder = async () => {
+        if (!folderForm.name.trim() || !editingFolder) {
+            toast.error('Please enter a folder name');
+            return;
+        }
+        setFolderSaving(true);
+        try {
+            const { data, error } = await supabase
+                .from('agent_asset_folders')
+                .update({
+                    name: folderForm.name.trim(),
+                    location: folderForm.location.trim() || null,
+                    description: folderForm.description.trim() || null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', editingFolder.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            setFolders(prev => prev.map(f =>
+                f.id === editingFolder.id ? { ...f, ...data } : f
+            ));
+
+            // If we're viewing this folder, update it too
+            if (selectedFolder?.id === editingFolder.id) {
+                setSelectedFolder(prev => ({ ...prev, ...data }));
+            }
+
+            setEditFolderVisible(false);
+            setEditingFolder(null);
+            setFolderForm({ name: '', location: '', description: '' });
+            toast.success('Folder updated!');
+        } catch (error) {
+            console.error('Edit folder error:', error);
+            toast.error('Failed to update folder');
+        } finally {
+            setFolderSaving(false);
+        }
+    };
+
+    const handleDeleteFolder = (folder) => {
+        Alert.alert(
+            'Delete Folder',
+            `Delete "${folder.name}" and all its files? This cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // 1. Get all assets' storage_path in the folder
+                            const { data: folderAssets } = await supabase
+                                .from('agent_assets')
+                                .select('storage_path')
+                                .eq('folder_id', folder.id);
+
+                            // 2. Delete files from Supabase Storage
+                            if (folderAssets?.length > 0) {
+                                const paths = folderAssets
+                                    .filter(a => a.storage_path)
+                                    .map(a => a.storage_path);
+                                if (paths.length > 0) {
+                                    await supabase.storage.from(STORAGE_BUCKET).remove(paths);
+                                }
+                            }
+
+                            // 3. Delete folder (FK cascade handles asset DB records)
+                            const { error } = await supabase
+                                .from('agent_asset_folders')
+                                .delete()
+                                .eq('id', folder.id)
+                                .eq('agent_id', user.id);
+
+                            if (error) throw error;
+
+                            setFolders(prev => prev.filter(f => f.id !== folder.id));
+                            if (folderModalVisible) setFolderModalVisible(false);
+                            toast.success('Folder deleted');
+                            fetchAssets(); // Refresh asset counts
+                        } catch (error) {
+                            console.error('Delete folder error:', error);
+                            toast.error('Failed to delete folder');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleToggleFolderSharing = async (folder) => {
+        try {
+            const newStatus = !folder.is_shared;
+            const { error } = await supabase
+                .from('agent_asset_folders')
+                .update({ is_shared: newStatus, updated_at: new Date().toISOString() })
+                .eq('id', folder.id);
+
+            if (error) throw error;
+
+            setFolders(prev => prev.map(f =>
+                f.id === folder.id ? { ...f, is_shared: newStatus } : f
+            ));
+            toast.success(newStatus ? 'Folder sharing enabled' : 'Folder sharing disabled');
+        } catch (error) {
+            console.error('Toggle sharing error:', error);
+            toast.error('Failed to update sharing');
+        }
+    };
+
+    // =============================================
+    // MOVE FILE TO FOLDER
+    // =============================================
+
+    const handleMoveFile = async () => {
+        if (!movingAsset) return;
+        try {
+            const { error } = await supabase
+                .from('agent_assets')
+                .update({
+                    folder_id: movingToFolderId,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', movingAsset.id);
+
+            if (error) throw error;
+
+            // Update local state
+            setAssets(prev => prev.map(a =>
+                a.id === movingAsset.id ? { ...a, folder_id: movingToFolderId } : a
+            ));
+
+            setMoveFileVisible(false);
+            setMovingAsset(null);
+            setMovingToFolderId(null);
+
+            const targetName = movingToFolderId
+                ? folders.find(f => f.id === movingToFolderId)?.name || 'folder'
+                : 'Uncategorized';
+            toast.success(`Moved to "${targetName}"`);
+            fetchAssets(); // Refresh folder counts
+        } catch (error) {
+            console.error('Move file error:', error);
+            toast.error('Failed to move file');
+        }
+    };
+
+    const openMoveFileModal = (asset) => {
+        setMovingAsset(asset);
+        setMovingToFolderId(asset.folder_id || null);
+        setMoveFileVisible(true);
+    };
+
+    const openEditFolderModal = (folder) => {
+        setEditingFolder(folder);
+        setFolderForm({
+            name: folder.name || '',
+            location: folder.location || '',
+            description: folder.description || '',
+        });
+        setEditFolderVisible(true);
+    };
+
+    const openCreateFolderModal = () => {
+        setFolderForm({ name: '', location: '', description: '' });
+        setCreateFolderVisible(true);
     };
 
     // File upload handler
@@ -379,45 +603,95 @@ const AgentAssetsScreen = ({ navigation }) => {
         setUploading(true);
         try {
             const fileName = file.fileName || file.name || `file_${Date.now()}`;
-            const fileType = file.mimeType || file.type || 'application/octet-stream';
+            const mimeType = file.mimeType || file.type || 'application/octet-stream';
+            const fileSize = file.fileSize || file.size || 0;
 
-            // For now, just add to local state (since no storage bucket exists)
-            const newAsset = {
-                id: Date.now().toString(),
-                file_name: fileName,
-                file_type: fileType,
-                file_size: file.fileSize || 0,
-                file_url: file.uri,
-                property_name: 'Uploaded Files',
-                location: 'Local',
-                created_at: new Date().toISOString(),
-                agent_id: user?.id,
-            };
+            // Determine file type category
+            let fileTypeCategory = 'document';
+            if (mimeType.startsWith('image')) fileTypeCategory = 'image';
+            else if (mimeType.startsWith('video')) fileTypeCategory = 'video';
 
-            // Try to upload to Supabase if storage is available
+            // Generate unique storage path (matches web pattern)
+            const timestamp = Date.now();
+            const cleanName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const storagePath = `${user.id}/uncategorized/${timestamp}_${cleanName}`;
+
+            // Read file as base64 for upload
+            let publicUrl = null;
+            let uploadedPath = null;
+
             try {
-                // Insert record into agent_assets table
-                const { data, error } = await supabase
-                    .from('agent_assets')
-                    .insert({
-                        agent_id: user?.id,
-                        file_name: fileName,
-                        file_type: fileType,
-                        file_size: file.fileSize || 0,
-                        file_url: file.uri, // Would be replaced with storage URL
-                        property_name: 'Uploaded Files',
-                        created_at: new Date().toISOString(),
-                    })
-                    .select()
-                    .single();
+                // Read the file from local URI
+                const fileInfo = await FileSystem.getInfoAsync(file.uri);
+                if (!fileInfo.exists) throw new Error('File not found');
 
-                if (!error && data) {
-                    newAsset.id = data.id;
+                const base64 = await FileSystem.readAsStringAsync(file.uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+
+                // Convert base64 to ArrayBuffer for upload
+                const binaryStr = atob(base64);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) {
+                    bytes[i] = binaryStr.charCodeAt(i);
                 }
-            } catch (dbError) {
-                logger.log('DB insert skipped:', dbError);
+
+                // Upload to Supabase Storage
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .upload(storagePath, bytes.buffer, {
+                        contentType: mimeType,
+                        cacheControl: '3600',
+                        upsert: false,
+                    });
+
+                if (uploadError) {
+                    console.error('Storage upload error:', uploadError);
+                    throw uploadError;
+                }
+
+                uploadedPath = storagePath;
+
+                // Get public URL
+                const { data: urlData } = supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(storagePath);
+                publicUrl = urlData?.publicUrl || null;
+
+            } catch (storageErr) {
+                console.error('Storage upload failed, saving record anyway:', storageErr);
+                // Even if storage fails, we'll save the record with what we have
             }
 
+            // Insert record into agent_assets table with correct columns
+            const insertData = {
+                agent_id: user.id,
+                file_name: fileName,
+                file_type: fileTypeCategory,
+                mime_type: mimeType,
+                file_size: fileSize,
+                storage_path: uploadedPath || null,
+                public_url: publicUrl || null,
+                is_shared: false,
+            };
+
+            const { data: dbData, error: dbError } = await supabase
+                .from('agent_assets')
+                .insert(insertData)
+                .select()
+                .single();
+
+            if (dbError) {
+                console.error('DB insert error:', dbError);
+                // Rollback storage if DB fails
+                if (uploadedPath) {
+                    await supabase.storage.from(STORAGE_BUCKET).remove([uploadedPath]);
+                }
+                throw dbError;
+            }
+
+            // Add normalized asset to state
+            const newAsset = normalizeAsset(dbData || insertData);
             setAssets(prev => [newAsset, ...prev]);
             toast.success('File uploaded successfully!');
             fetchAssets(); // Refresh to update counts
@@ -433,37 +707,104 @@ const AgentAssetsScreen = ({ navigation }) => {
     // File actions
     const handleOpenFile = (asset) => {
         const type = getFileType(asset.file_type, asset.file_name);
+        const url = asset.file_url;
+
+        if (!url) {
+            toast.error('File URL not available. Try re-uploading the file.');
+            return;
+        }
 
         if (type === 'image' || type === 'video') {
             setSelectedAsset(asset);
             setPreviewModalVisible(true);
         } else if (type === 'pdf' || type === 'doc') {
-            // Open document in browser
-            if (asset.file_url) {
-                WebBrowser.openBrowserAsync(asset.file_url).catch(() => {
-                    Linking.openURL(asset.file_url);
+            // Open document in browser or native viewer
+            WebBrowser.openBrowserAsync(url).catch(() => {
+                Linking.openURL(url).catch(() => {
+                    toast.error('Cannot open this document');
+                });
+            });
+        } else {
+            // Open any other file with native handler
+            Linking.openURL(url).catch(() => {
+                toast.info('Cannot open this file type');
+            });
+        }
+    };
+
+    // Open file with device's default media viewer
+    const handleOpenInNativeViewer = async (asset) => {
+        const url = asset.file_url;
+        if (!url) {
+            toast.error('File URL not available');
+            return;
+        }
+        try {
+            // Download to cache then open with native viewer
+            const ext = asset.file_name?.split('.').pop() || 'tmp';
+            const localUri = FileSystem.cacheDirectory + `asset_${Date.now()}.${ext}`;
+            toast.info('Downloading file...');
+            const { uri } = await FileSystem.downloadAsync(url, localUri);
+
+            const canShare = await Sharing.isAvailableAsync();
+            if (canShare) {
+                await Sharing.shareAsync(uri, {
+                    mimeType: asset.file_type || '*/*',
+                    dialogTitle: asset.file_name,
+                    UTI: asset.file_type || 'public.data',
                 });
             } else {
-                toast.info('Document preview not available');
+                // Fallback: open URL in browser
+                await Linking.openURL(url);
             }
-        } else {
-            toast.info(`Opening ${asset.file_name}`);
+        } catch (error) {
+            console.error('Native viewer error:', error);
+            // Fallback to browser
+            Linking.openURL(url).catch(() => toast.error('Cannot open file'));
         }
     };
 
     const handleShareFile = async (asset) => {
+        const url = asset.file_url;
+        if (!url) {
+            toast.info('File sharing not available — no URL');
+            return;
+        }
+
         try {
-            if (asset.file_url) {
-                await Share.share({
-                    message: `Check out this file: ${asset.file_name}`,
-                    url: asset.file_url,
-                    title: asset.file_name,
+            // Try native sharing by downloading first (gives better share sheet)
+            const ext = asset.file_name?.split('.').pop() || 'tmp';
+            const localUri = FileSystem.cacheDirectory + `share_${Date.now()}.${ext}`;
+
+            const canNativeShare = await Sharing.isAvailableAsync();
+            if (canNativeShare) {
+                toast.info('Preparing file...');
+                const { uri } = await FileSystem.downloadAsync(url, localUri);
+                await Sharing.shareAsync(uri, {
+                    mimeType: asset.file_type || '*/*',
+                    dialogTitle: `Share ${asset.file_name}`,
                 });
             } else {
-                toast.info('File sharing not available for local files');
+                // Fallback: use RN Share with URL
+                await Share.share({
+                    message: `Check out this file: ${asset.file_name}\n${url}`,
+                    url: Platform.OS === 'ios' ? url : undefined,
+                    title: asset.file_name,
+                });
             }
         } catch (error) {
-            console.error('Share error:', error);
+            if (error.message !== 'User did not share') {
+                console.error('Share error:', error);
+                // Fallback to basic share
+                try {
+                    await Share.share({
+                        message: `${asset.file_name}: ${url}`,
+                        title: asset.file_name,
+                    });
+                } catch (e) {
+                    toast.error('Sharing failed');
+                }
+            }
         }
     };
 
@@ -478,6 +819,14 @@ const AgentAssetsScreen = ({ navigation }) => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
+                            // Delete from storage first
+                            if (asset.storage_path) {
+                                await supabase.storage
+                                    .from(STORAGE_BUCKET)
+                                    .remove([asset.storage_path]);
+                            }
+
+                            // Then delete DB record
                             await supabase
                                 .from('agent_assets')
                                 .delete()
@@ -529,9 +878,10 @@ const AgentAssetsScreen = ({ navigation }) => {
 
     // Filter assets based on search and tab
     const filteredAssets = assets.filter(asset => {
+        const folderName = asset.folder_id ? folders.find(f => f.id === asset.folder_id)?.name : '';
         const matchesSearch = !searchQuery ||
             asset.file_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            asset.property_name?.toLowerCase().includes(searchQuery.toLowerCase());
+            (folderName && folderName.toLowerCase().includes(searchQuery.toLowerCase()));
 
         if (activeTab === 'all') return matchesSearch;
         const type = getFileType(asset.file_type, asset.file_name);
@@ -541,47 +891,55 @@ const AgentAssetsScreen = ({ navigation }) => {
         return matchesSearch;
     });
 
-    // Property Folder Card
-    const PropertyCard = ({ property }) => {
-        const hasImage = property.thumbnail;
+    // Folder Card (uses real agent_asset_folders data)
+    const FolderCard = ({ folder }) => {
+        const hasImage = folder.thumbnail_url;
+        const fileCount = folder.assetCount || 0;
 
         return (
             <TouchableOpacity
                 style={styles.propertyCard}
                 onPress={() => {
-                    setSelectedFolder(property);
+                    setSelectedFolder(folder);
                     setFolderModalVisible(true);
                 }}
                 activeOpacity={0.8}
             >
                 <View style={styles.propertyThumbnail}>
                     {hasImage ? (
-                        <Image
-                            source={{ uri: property.thumbnail }}
+                        <SafeImage
+                            uri={folder.thumbnail_url}
                             style={styles.thumbnailImage}
-                            resizeMode="cover"
+                            fallbackIcon="folder"
+                            fallbackColor={COLORS.primary}
+                            fallbackBg={COLORS.primaryLight}
                         />
                     ) : (
                         <View style={styles.folderIconContainer}>
                             <Feather name="folder" size={40} color={COLORS.primary} />
                         </View>
                     )}
+                    {folder.is_shared && (
+                        <View style={styles.folderSharedBadge}>
+                            <Feather name="link" size={10} color="#FFFFFF" />
+                        </View>
+                    )}
                 </View>
                 <View style={styles.propertyInfo}>
                     <View style={styles.propertyHeader}>
-                        <Text style={styles.propertyName} numberOfLines={1}>{property.name}</Text>
-                        <TouchableOpacity onPress={() => openFolderMenu(property)}>
+                        <Text style={styles.propertyName} numberOfLines={1}>{folder.name}</Text>
+                        <TouchableOpacity onPress={() => openFolderMenu(folder)}>
                             <Feather name="more-vertical" size={18} color={COLORS.textSecondary} />
                         </TouchableOpacity>
                     </View>
-                    {property.location ? (
+                    {folder.location ? (
                         <View style={styles.propertyMeta}>
                             <Feather name="map-pin" size={12} color={COLORS.textSecondary} />
-                            <Text style={styles.propertyLocation}>{property.location}</Text>
+                            <Text style={styles.propertyLocation}>{folder.location}</Text>
                         </View>
                     ) : null}
                     <Text style={styles.propertyFileCount}>
-                        {property.assets?.length || 0} file{(property.assets?.length || 0) !== 1 ? 's' : ''}
+                        {fileCount} file{fileCount !== 1 ? 's' : ''}
                     </Text>
                 </View>
             </TouchableOpacity>
@@ -599,10 +957,12 @@ const AgentAssetsScreen = ({ navigation }) => {
                 activeOpacity={0.8}
             >
                 {showThumbnail && type === 'image' && file.file_url ? (
-                    <Image
-                        source={{ uri: file.file_url }}
+                    <SafeImage
+                        uri={file.file_url}
                         style={styles.fileThumbnail}
-                        resizeMode="cover"
+                        fallbackIcon="image"
+                        fallbackColor={COLORS.blue}
+                        fallbackBg={COLORS.blueLight}
                     />
                 ) : (
                     <View style={[styles.fileIcon, { backgroundColor: getFileIconBg(type) }]}>
@@ -612,7 +972,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                 <View style={styles.fileInfo}>
                     <Text style={styles.fileName} numberOfLines={1}>{file.file_name}</Text>
                     <Text style={styles.fileMeta}>
-                        {file.property_name || 'Unknown'} • {formatBytes(file.file_size)}
+                        {(file.folder_id && folders.find(f => f.id === file.folder_id)?.name) || 'Uncategorized'} • {formatBytes(file.file_size)}
                     </Text>
                 </View>
                 <TouchableOpacity onPress={() => openFileMenu(file)}>
@@ -633,12 +993,14 @@ const AgentAssetsScreen = ({ navigation }) => {
                 activeOpacity={0.8}
             >
                 {type === 'image' && file.file_url ? (
-                    <Image
-                        source={{ uri: file.file_url }}
+                    <SafeImage
+                        uri={file.file_url}
                         style={styles.gridThumbnail}
-                        resizeMode="cover"
+                        fallbackIcon="image"
+                        fallbackColor={COLORS.blue}
+                        fallbackBg={COLORS.blueLight}
                     />
-                ) : type === 'video' ? (
+                ) : type === 'video' && file.file_url ? (
                     <View style={[styles.gridThumbnail, styles.videoThumbnail]}>
                         <Feather name="play-circle" size={32} color="#FFFFFF" />
                     </View>
@@ -675,64 +1037,145 @@ const AgentAssetsScreen = ({ navigation }) => {
     const PreviewModal = () => {
         if (!selectedAsset) return null;
         const type = getFileType(selectedAsset.file_type, selectedAsset.file_name);
+        const hasUrl = !!selectedAsset.file_url;
 
         return (
             <Modal
                 visible={previewModalVisible}
-                transparent
                 animationType="fade"
-                onRequestClose={() => setPreviewModalVisible(false)}
+                presentationStyle="fullScreen"
+                onRequestClose={() => {
+                    setPreviewModalVisible(false);
+                    if (videoRef.current) {
+                        videoRef.current.pauseAsync().catch(() => {});
+                    }
+                }}
             >
                 <View style={styles.previewModal}>
+                    {/* Close button */}
                     <TouchableOpacity
-                        style={styles.previewClose}
-                        onPress={() => setPreviewModalVisible(false)}
+                        style={[styles.previewClose, { top: insets.top + 10 }]}
+                        onPress={() => {
+                            setPreviewModalVisible(false);
+                            if (videoRef.current) {
+                                videoRef.current.pauseAsync().catch(() => {});
+                            }
+                        }}
                     >
-                        <Feather name="x" size={28} color="#FFFFFF" />
+                        <View style={styles.previewCloseCircle}>
+                            <Feather name="x" size={22} color="#FFFFFF" />
+                        </View>
                     </TouchableOpacity>
 
+                    {/* Media Content */}
                     <View style={styles.previewContent}>
-                        {type === 'image' ? (
-                            <Image
-                                source={{ uri: selectedAsset.file_url }}
-                                style={styles.previewImage}
-                                resizeMode="contain"
-                            />
+                        {!hasUrl ? (
+                            <View style={styles.previewErrorContainer}>
+                                <Feather name="alert-circle" size={48} color="rgba(255,255,255,0.5)" />
+                                <Text style={styles.previewErrorText}>File URL not available</Text>
+                            </View>
+                        ) : type === 'image' ? (
+                            <View style={styles.previewMediaContainer}>
+                                <Image
+                                    source={{ uri: selectedAsset.file_url }}
+                                    style={styles.previewImage}
+                                    resizeMode="contain"
+                                    onLoad={() => setMediaLoading(false)}
+                                    onError={(e) => {
+                                        console.error('Image load error:', e.nativeEvent?.error);
+                                        setMediaLoading(false);
+                                        setMediaError(true);
+                                    }}
+                                />
+                                {mediaLoading && (
+                                    <View style={styles.previewLoadingOverlay}>
+                                        <ActivityIndicator size="large" color={COLORS.primary} />
+                                        <Text style={styles.previewLoadingText}>Loading image...</Text>
+                                    </View>
+                                )}
+                                {mediaError && (
+                                    <View style={styles.previewErrorContainer}>
+                                        <Feather name="image" size={48} color="rgba(255,255,255,0.5)" />
+                                        <Text style={styles.previewErrorText}>Unable to load image</Text>
+                                        <Text style={styles.previewErrorSub}>{selectedAsset.file_url?.substring(0, 60)}...</Text>
+                                    </View>
+                                )}
+                            </View>
                         ) : type === 'video' ? (
-                            <Video
-                                ref={videoRef}
-                                source={{ uri: selectedAsset.file_url }}
-                                style={styles.previewVideo}
-                                useNativeControls
-                                resizeMode={ResizeMode.CONTAIN}
-                                shouldPlay
-                            />
-                        ) : null}
+                            <View style={styles.previewMediaContainer}>
+                                <Video
+                                    ref={videoRef}
+                                    source={{ uri: selectedAsset.file_url }}
+                                    style={styles.previewVideo}
+                                    useNativeControls
+                                    resizeMode={ResizeMode.CONTAIN}
+                                    shouldPlay
+                                    isLooping={false}
+                                    onLoad={() => setMediaLoading(false)}
+                                    onReadyForDisplay={() => setMediaLoading(false)}
+                                    onError={(error) => {
+                                        console.error('Video playback error:', error);
+                                        setMediaLoading(false);
+                                        setMediaError(true);
+                                    }}
+                                />
+                                {mediaLoading && (
+                                    <View style={styles.previewLoadingOverlay}>
+                                        <ActivityIndicator size="large" color={COLORS.primary} />
+                                        <Text style={styles.previewLoadingText}>Loading video...</Text>
+                                    </View>
+                                )}
+                                {mediaError && (
+                                    <View style={styles.previewErrorContainer}>
+                                        <Feather name="video-off" size={48} color="rgba(255,255,255,0.5)" />
+                                        <Text style={styles.previewErrorText}>Unable to play video</Text>
+                                        <Text style={styles.previewErrorSub}>The video format may not be supported</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ) : (
+                            <View style={styles.previewErrorContainer}>
+                                <Feather name="file" size={48} color="rgba(255,255,255,0.5)" />
+                                <Text style={styles.previewErrorText}>Preview not available for this file type</Text>
+                            </View>
+                        )}
                     </View>
 
+                    {/* File Info */}
                     <View style={styles.previewInfo}>
-                        <Text style={styles.previewFileName}>{selectedAsset.file_name}</Text>
+                        <Text style={styles.previewFileName} numberOfLines={2}>{selectedAsset.file_name}</Text>
                         <Text style={styles.previewFileMeta}>
                             {formatBytes(selectedAsset.file_size)}
                         </Text>
                     </View>
 
-                    <View style={styles.previewActions}>
+                    {/* Actions */}
+                    <View style={[styles.previewActions, { paddingBottom: insets.bottom + 20 }]}>
                         <TouchableOpacity
-                            style={styles.previewAction}
+                            style={styles.previewActionBtn}
                             onPress={() => handleShareFile(selectedAsset)}
                         >
-                            <Feather name="share-2" size={22} color="#FFFFFF" />
+                            <Feather name="share-2" size={18} color="#FFFFFF" />
                             <Text style={styles.previewActionText}>Share</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={styles.previewAction}
+                            style={[styles.previewActionBtn, { backgroundColor: 'rgba(59,130,246,0.2)' }]}
+                            onPress={() => {
+                                setPreviewModalVisible(false);
+                                handleOpenInNativeViewer(selectedAsset);
+                            }}
+                        >
+                            <Feather name="external-link" size={18} color="#3B82F6" />
+                            <Text style={[styles.previewActionText, { color: '#3B82F6' }]}>Open In...</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.previewActionBtn, styles.previewActionDanger]}
                             onPress={() => {
                                 setPreviewModalVisible(false);
                                 handleDeleteFile(selectedAsset);
                             }}
                         >
-                            <Feather name="trash-2" size={22} color="#EF4444" />
+                            <Feather name="trash-2" size={18} color="#EF4444" />
                             <Text style={[styles.previewActionText, { color: '#EF4444' }]}>Delete</Text>
                         </TouchableOpacity>
                     </View>
@@ -741,9 +1184,11 @@ const AgentAssetsScreen = ({ navigation }) => {
         );
     };
 
-    // Folder Detail Modal
+    // Folder Detail Modal — shows folder's assets filtered by folder_id
     const FolderDetailModal = () => {
         if (!selectedFolder) return null;
+
+        const folderAssets = assets.filter(a => a.folder_id === selectedFolder.id);
 
         return (
             <Modal
@@ -756,21 +1201,64 @@ const AgentAssetsScreen = ({ navigation }) => {
                         <TouchableOpacity onPress={() => setFolderModalVisible(false)}>
                             <Feather name="arrow-left" size={24} color={COLORS.text} />
                         </TouchableOpacity>
-                        <Text style={styles.folderModalTitle}>{selectedFolder.name}</Text>
-                        <TouchableOpacity onPress={() => openFolderMenu(selectedFolder)}>
-                            <Feather name="more-vertical" size={24} color={COLORS.text} />
-                        </TouchableOpacity>
+                        <Text style={styles.folderModalTitle} numberOfLines={1}>{selectedFolder.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <TouchableOpacity onPress={() => {
+                                setFolderModalVisible(false);
+                                openEditFolderModal(selectedFolder);
+                            }}>
+                                <Feather name="edit-2" size={20} color={COLORS.text} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => openFolderMenu(selectedFolder)}>
+                                <Feather name="more-vertical" size={24} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
+                    {/* Folder info bar */}
+                    {(selectedFolder.location || selectedFolder.description) && (
+                        <View style={styles.folderInfoBar}>
+                            {selectedFolder.location ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Feather name="map-pin" size={13} color={COLORS.textSecondary} />
+                                    <Text style={styles.folderInfoText}>{selectedFolder.location}</Text>
+                                </View>
+                            ) : null}
+                            {selectedFolder.description ? (
+                                <Text style={styles.folderInfoDesc} numberOfLines={2}>{selectedFolder.description}</Text>
+                            ) : null}
+                            {selectedFolder.is_shared && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                    <Feather name="link" size={13} color={COLORS.success} />
+                                    <Text style={[styles.folderInfoText, { color: COLORS.success }]}>Shared</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
                     <ScrollView style={styles.folderContent}>
-                        {selectedFolder.assets?.length === 0 ? (
+                        {/* Upload to folder button */}
+                        <TouchableOpacity
+                            style={styles.uploadToFolderBtn}
+                            onPress={() => {
+                                // Close folder modal, do upload, then the user can move it
+                                setFolderModalVisible(false);
+                                handleUpload();
+                            }}
+                        >
+                            <Feather name="upload-cloud" size={18} color={COLORS.primary} />
+                            <Text style={styles.uploadToFolderText}>Upload to this folder</Text>
+                        </TouchableOpacity>
+
+                        {folderAssets.length === 0 ? (
                             <View style={styles.emptyFolder}>
                                 <Feather name="folder" size={48} color={COLORS.textSecondary} />
                                 <Text style={styles.emptyTitle}>No files in this folder</Text>
+                                <Text style={styles.emptyText}>Upload or move files here</Text>
                             </View>
                         ) : (
                             <View style={styles.folderGrid}>
-                                {selectedFolder.assets?.map(file => (
+                                {folderAssets.map(file => (
                                     <GridFileItem key={file.id} file={file} />
                                 ))}
                             </View>
@@ -812,11 +1300,33 @@ const AgentAssetsScreen = ({ navigation }) => {
                                 style={styles.menuItem}
                                 onPress={() => {
                                     setMenuModalVisible(false);
-                                    toast.info('Rename folder coming soon');
+                                    openEditFolderModal(menuTarget.data);
                                 }}
                             >
                                 <Feather name="edit-2" size={20} color={COLORS.text} />
-                                <Text style={styles.menuText}>Rename</Text>
+                                <Text style={styles.menuText}>Edit Folder</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleToggleFolderSharing(menuTarget.data);
+                                }}
+                            >
+                                <Feather name={menuTarget.data.is_shared ? 'link-2' : 'link'} size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>
+                                    {menuTarget.data.is_shared ? 'Disable Sharing' : 'Enable Sharing'}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.menuItem, styles.menuItemDanger]}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleDeleteFolder(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="trash-2" size={20} color={COLORS.error} />
+                                <Text style={[styles.menuText, { color: COLORS.error }]}>Delete Folder</Text>
                             </TouchableOpacity>
                         </>
                     ) : (
@@ -830,6 +1340,26 @@ const AgentAssetsScreen = ({ navigation }) => {
                             >
                                 <Feather name="eye" size={20} color={COLORS.text} />
                                 <Text style={styles.menuText}>Preview</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    handleOpenInNativeViewer(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="external-link" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>Open In...</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setMenuModalVisible(false);
+                                    openMoveFileModal(menuTarget.data);
+                                }}
+                            >
+                                <Feather name="folder-plus" size={20} color={COLORS.text} />
+                                <Text style={styles.menuText}>Move to Folder</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.menuItem}
@@ -869,6 +1399,258 @@ const AgentAssetsScreen = ({ navigation }) => {
             </TouchableOpacity>
         </Modal>
     );
+
+    // Create Folder Modal
+    const CreateFolderModal = () => (
+        <Modal
+            visible={createFolderVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setCreateFolderVisible(false)}
+        >
+            <View style={styles.formModalOverlay}>
+                <View style={styles.formModalContainer}>
+                    <View style={styles.formModalHeader}>
+                        <Text style={styles.formModalTitle}>New Folder</Text>
+                        <TouchableOpacity onPress={() => setCreateFolderVisible(false)}>
+                            <Feather name="x" size={22} color={COLORS.text} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.formModalBody}>
+                        <Text style={styles.formLabel}>Folder Name *</Text>
+                        <TextInput
+                            style={styles.formInput}
+                            placeholder="e.g. Sunset Apartments"
+                            placeholderTextColor={COLORS.textSecondary}
+                            value={folderForm.name}
+                            onChangeText={(t) => setFolderForm(prev => ({ ...prev, name: t }))}
+                            autoFocus
+                        />
+
+                        <Text style={styles.formLabel}>Location</Text>
+                        <TextInput
+                            style={styles.formInput}
+                            placeholder="e.g. 123 Main St, City"
+                            placeholderTextColor={COLORS.textSecondary}
+                            value={folderForm.location}
+                            onChangeText={(t) => setFolderForm(prev => ({ ...prev, location: t }))}
+                        />
+
+                        <Text style={styles.formLabel}>Description</Text>
+                        <TextInput
+                            style={[styles.formInput, styles.formTextArea]}
+                            placeholder="Optional description..."
+                            placeholderTextColor={COLORS.textSecondary}
+                            value={folderForm.description}
+                            onChangeText={(t) => setFolderForm(prev => ({ ...prev, description: t }))}
+                            multiline
+                            numberOfLines={3}
+                        />
+                    </View>
+
+                    <View style={styles.formModalFooter}>
+                        <TouchableOpacity
+                            style={styles.formCancelBtn}
+                            onPress={() => setCreateFolderVisible(false)}
+                        >
+                            <Text style={styles.formCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.formSaveBtn, folderSaving && { opacity: 0.6 }]}
+                            onPress={handleCreateFolder}
+                            disabled={folderSaving}
+                        >
+                            {folderSaving ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.formSaveText}>Create Folder</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    // Edit Folder Modal
+    const EditFolderModal = () => (
+        <Modal
+            visible={editFolderVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setEditFolderVisible(false)}
+        >
+            <View style={styles.formModalOverlay}>
+                <View style={styles.formModalContainer}>
+                    <View style={styles.formModalHeader}>
+                        <Text style={styles.formModalTitle}>Edit Folder</Text>
+                        <TouchableOpacity onPress={() => setEditFolderVisible(false)}>
+                            <Feather name="x" size={22} color={COLORS.text} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.formModalBody}>
+                        <Text style={styles.formLabel}>Folder Name *</Text>
+                        <TextInput
+                            style={styles.formInput}
+                            placeholder="Folder name"
+                            placeholderTextColor={COLORS.textSecondary}
+                            value={folderForm.name}
+                            onChangeText={(t) => setFolderForm(prev => ({ ...prev, name: t }))}
+                            autoFocus
+                        />
+
+                        <Text style={styles.formLabel}>Location</Text>
+                        <TextInput
+                            style={styles.formInput}
+                            placeholder="e.g. 123 Main St, City"
+                            placeholderTextColor={COLORS.textSecondary}
+                            value={folderForm.location}
+                            onChangeText={(t) => setFolderForm(prev => ({ ...prev, location: t }))}
+                        />
+
+                        <Text style={styles.formLabel}>Description</Text>
+                        <TextInput
+                            style={[styles.formInput, styles.formTextArea]}
+                            placeholder="Optional description..."
+                            placeholderTextColor={COLORS.textSecondary}
+                            value={folderForm.description}
+                            onChangeText={(t) => setFolderForm(prev => ({ ...prev, description: t }))}
+                            multiline
+                            numberOfLines={3}
+                        />
+                    </View>
+
+                    <View style={styles.formModalFooter}>
+                        <TouchableOpacity
+                            style={styles.formCancelBtn}
+                            onPress={() => setEditFolderVisible(false)}
+                        >
+                            <Text style={styles.formCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.formSaveBtn, folderSaving && { opacity: 0.6 }]}
+                            onPress={handleEditFolder}
+                            disabled={folderSaving}
+                        >
+                            {folderSaving ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.formSaveText}>Save Changes</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    // Move File to Folder Modal
+    const MoveToFolderModal = () => {
+        if (!movingAsset) return null;
+
+        return (
+            <Modal
+                visible={moveFileVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setMoveFileVisible(false)}
+            >
+                <View style={styles.formModalOverlay}>
+                    <View style={styles.formModalContainer}>
+                        <View style={styles.formModalHeader}>
+                            <Text style={styles.formModalTitle}>Move to Folder</Text>
+                            <TouchableOpacity onPress={() => setMoveFileVisible(false)}>
+                                <Feather name="x" size={22} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.formModalBody}>
+                            <Text style={styles.moveFileLabel}>
+                                Moving: <Text style={{ fontFamily: 'DMSans_600SemiBold' }}>{movingAsset.file_name}</Text>
+                            </Text>
+
+                            <ScrollView style={styles.moveFileList} bounces={false}>
+                                {/* Uncategorized option (no folder) */}
+                                <TouchableOpacity
+                                    style={[
+                                        styles.moveFileOption,
+                                        movingToFolderId === null && styles.moveFileOptionSelected,
+                                    ]}
+                                    onPress={() => setMovingToFolderId(null)}
+                                >
+                                    <Feather
+                                        name="inbox"
+                                        size={20}
+                                        color={movingToFolderId === null ? COLORS.primary : COLORS.textSecondary}
+                                    />
+                                    <Text style={[
+                                        styles.moveFileName,
+                                        movingToFolderId === null && { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' },
+                                    ]}>Uncategorized</Text>
+                                    {movingToFolderId === null && (
+                                        <Feather name="check" size={18} color={COLORS.primary} />
+                                    )}
+                                </TouchableOpacity>
+
+                                {/* Folder options */}
+                                {folders.map(folder => (
+                                    <TouchableOpacity
+                                        key={folder.id}
+                                        style={[
+                                            styles.moveFileOption,
+                                            movingToFolderId === folder.id && styles.moveFileOptionSelected,
+                                        ]}
+                                        onPress={() => setMovingToFolderId(folder.id)}
+                                    >
+                                        <Feather
+                                            name="folder"
+                                            size={20}
+                                            color={movingToFolderId === folder.id ? COLORS.primary : COLORS.textSecondary}
+                                        />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[
+                                                styles.moveFileName,
+                                                movingToFolderId === folder.id && { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' },
+                                            ]}>{folder.name}</Text>
+                                            {folder.location ? (
+                                                <Text style={styles.moveFolderLocation}>{folder.location}</Text>
+                                            ) : null}
+                                        </View>
+                                        {movingToFolderId === folder.id && (
+                                            <Feather name="check" size={18} color={COLORS.primary} />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+
+                                {folders.length === 0 && (
+                                    <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                                        <Text style={styles.moveFileLabel}>No folders yet. Create one first.</Text>
+                                    </View>
+                                )}
+                            </ScrollView>
+                        </View>
+
+                        <View style={styles.formModalFooter}>
+                            <TouchableOpacity
+                                style={styles.formCancelBtn}
+                                onPress={() => setMoveFileVisible(false)}
+                            >
+                                <Text style={styles.formCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.formSaveBtn}
+                                onPress={handleMoveFile}
+                            >
+                                <Text style={styles.formSaveText}>Move</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
 
     if (loading) {
         return (
@@ -994,17 +1776,36 @@ const AgentAssetsScreen = ({ navigation }) => {
                     <TabButton label="Documents" value="documents" count={storageUsage.documentCount} />
                 </ScrollView>
 
-                {/* Properties Section */}
-                {activeTab === 'all' && properties.length > 0 && (
+                {/* Folders Section */}
+                {activeTab === 'all' && (
                     <>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>PROPERTIES</Text>
+                            <Text style={styles.sectionTitle}>FOLDERS</Text>
+                            <TouchableOpacity
+                                style={styles.newFolderBtn}
+                                onPress={openCreateFolderModal}
+                            >
+                                <Feather name="folder-plus" size={14} color={COLORS.primary} />
+                                <Text style={styles.newFolderBtnText}>New Folder</Text>
+                            </TouchableOpacity>
                         </View>
-                        <View style={styles.propertiesGrid}>
-                            {properties.map((property) => (
-                                <PropertyCard key={property.id} property={property} />
-                            ))}
-                        </View>
+                        {folders.length > 0 ? (
+                            <View style={styles.propertiesGrid}>
+                                {folders.map((folder) => (
+                                    <FolderCard key={folder.id} folder={folder} />
+                                ))}
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.emptyFolderCard}
+                                onPress={openCreateFolderModal}
+                                activeOpacity={0.8}
+                            >
+                                <Feather name="folder-plus" size={28} color={COLORS.primary} />
+                                <Text style={styles.emptyFolderCardText}>Create your first folder</Text>
+                                <Text style={styles.emptyFolderCardSub}>Organize your assets by property or project</Text>
+                            </TouchableOpacity>
+                        )}
                     </>
                 )}
 
@@ -1054,9 +1855,12 @@ const AgentAssetsScreen = ({ navigation }) => {
             </TouchableOpacity>
 
             {/* Modals */}
-            <PreviewModal />
-            <FolderDetailModal />
-            <MenuModal />
+            {PreviewModal()}
+            {FolderDetailModal()}
+            {MenuModal()}
+            {CreateFolderModal()}
+            {EditFolderModal()}
+            {MoveToFolderModal()}
         </View>
     );
 };
@@ -1481,15 +2285,18 @@ const styles = StyleSheet.create({
     // Preview Modal
     previewModal: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.95)',
+        backgroundColor: '#000000',
     },
     previewClose: {
         position: 'absolute',
-        top: 50,
-        right: 20,
+        right: 16,
         zIndex: 10,
-        width: 44,
-        height: 44,
+    },
+    previewCloseCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1498,22 +2305,62 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    previewMediaContainer: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT * 0.65,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     previewImage: {
         width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT * 0.6,
+        height: SCREEN_HEIGHT * 0.65,
     },
     previewVideo: {
         width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT * 0.5,
+        height: SCREEN_HEIGHT * 0.55,
+        backgroundColor: '#000',
+    },
+    previewLoadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.8)',
+    },
+    previewLoadingText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
+        color: 'rgba(255,255,255,0.7)',
+        marginTop: 12,
+    },
+    previewErrorContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    previewErrorText: {
+        fontSize: 16,
+        fontFamily: 'DMSans_500Medium',
+        color: 'rgba(255,255,255,0.7)',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    previewErrorSub: {
+        fontSize: 11,
+        fontFamily: 'DMSans_400Regular',
+        color: 'rgba(255,255,255,0.4)',
+        marginTop: 8,
+        textAlign: 'center',
     },
     previewInfo: {
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
         alignItems: 'center',
     },
     previewFileName: {
         fontSize: 16,
         fontFamily: 'DMSans_600SemiBold',
         color: '#FFFFFF',
+        textAlign: 'center',
     },
     previewFileMeta: {
         fontSize: 13,
@@ -1524,17 +2371,26 @@ const styles = StyleSheet.create({
     previewActions: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: 40,
-        paddingBottom: 40,
+        gap: 10,
+        paddingBottom: 20,
+        paddingHorizontal: 16,
     },
-    previewAction: {
+    previewActionBtn: {
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 25,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    previewActionDanger: {
+        backgroundColor: 'rgba(239,68,68,0.15)',
     },
     previewActionText: {
-        fontSize: 12,
+        fontSize: 13,
         fontFamily: 'DMSans_500Medium',
         color: '#FFFFFF',
-        marginTop: 4,
     },
     // Folder Modal
     folderModal: {
@@ -1594,6 +2450,213 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
+    },
+    // Folder shared badge
+    folderSharedBadge: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: COLORS.success,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Folder info bar (inside FolderDetailModal)
+    folderInfoBar: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: COLORS.card,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    folderInfoText: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+    },
+    folderInfoDesc: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 4,
+    },
+    // Upload to folder button
+    uploadToFolderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        marginBottom: 16,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: COLORS.primary,
+        borderStyle: 'dashed',
+        backgroundColor: COLORS.primaryLight,
+    },
+    uploadToFolderText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.primary,
+    },
+    // New Folder button in section header
+    newFolderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        backgroundColor: COLORS.primaryLight,
+    },
+    newFolderBtnText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.primary,
+    },
+    // Empty folder card (create first folder CTA)
+    emptyFolderCard: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 28,
+        marginBottom: 24,
+        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: COLORS.border,
+        borderStyle: 'dashed',
+        backgroundColor: COLORS.card,
+    },
+    emptyFolderCardText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+        marginTop: 8,
+    },
+    emptyFolderCardSub: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 4,
+    },
+    // Form Modal (Create/Edit Folder + Move to Folder)
+    formModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    formModalContainer: {
+        backgroundColor: COLORS.card,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '85%',
+    },
+    formModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    formModalTitle: {
+        fontSize: 18,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+    },
+    formModalBody: {
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+    },
+    formLabel: {
+        fontSize: 13,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+        marginBottom: 6,
+        marginTop: 12,
+    },
+    formInput: {
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.text,
+        backgroundColor: COLORS.background,
+    },
+    formTextArea: {
+        minHeight: 72,
+        textAlignVertical: 'top',
+    },
+    formModalFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 10,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+    },
+    formCancelBtn: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: COLORS.background,
+    },
+    formCancelText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
+    },
+    formSaveBtn: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: COLORS.primary,
+    },
+    formSaveText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+        color: '#FFFFFF',
+    },
+    // Move file modal
+    moveFileLabel: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginBottom: 10,
+    },
+    moveFileList: {
+        maxHeight: 300,
+    },
+    moveFileOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        marginBottom: 4,
+    },
+    moveFileOptionSelected: {
+        backgroundColor: COLORS.primaryLight,
+    },
+    moveFileName: {
+        flex: 1,
+        fontSize: 15,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.text,
+    },
+    moveFolderLocation: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 1,
     },
 });
 

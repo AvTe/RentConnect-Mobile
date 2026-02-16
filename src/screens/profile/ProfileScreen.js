@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { supabase } from '../../lib/supabase';
+import { updateUser } from '../../lib/database';
 
 const COLORS = {
     primary: '#FE9200',
@@ -59,18 +59,13 @@ const ProfileScreen = ({ navigation }) => {
 
         setSaving(true);
         try {
-            const { error } = await supabase
-                .from('users')
-                .upsert({
-                    id: user.id,
-                    email: user.email,
-                    name: fullName.trim(),
-                    city: city.trim(),
-                    phone: phone.trim(),
-                    updated_at: new Date().toISOString(),
-                });
+            const result = await updateUser(user.id, {
+                name: fullName.trim(),
+                city: city.trim(),
+                phone: phone.trim(),
+            });
 
-            if (error) throw error;
+            if (!result.success) throw new Error(result.error);
 
             if (refreshProfile) await refreshProfile();
             toast.success('Profile updated successfully');

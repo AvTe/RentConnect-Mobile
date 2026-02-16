@@ -167,10 +167,17 @@ const AgentRewardsScreen = ({ navigation }) => {
                         </Text>
                         <TouchableOpacity
                             style={styles.premiumButton}
-                            onPress={() => navigation.navigate('BuyCredits')}
+                            onPress={() => navigation.navigate('Subscription')}
                             activeOpacity={0.9}
                         >
                             <Text style={styles.premiumButtonText}>View Premium Plans</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.premiumButton, { backgroundColor: '#FFF5E6', marginTop: 10 }]}
+                            onPress={() => navigation.navigate('Vouchers')}
+                            activeOpacity={0.9}
+                        >
+                            <Text style={[styles.premiumButtonText, { color: COLORS.primary }]}>View My Vouchers</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (

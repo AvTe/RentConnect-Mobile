@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { supabase } from '../../lib/supabase';
+import { getTenantLeads, updateLeadStatus, deleteLead } from '../../lib/leadService';
 
 const COLORS = {
     primary: '#FE9200',
@@ -42,16 +42,12 @@ const MyRequestsScreen = ({ navigation }) => {
 
     const fetchRequests = useCallback(async () => {
         try {
-            const { data, error } = await supabase
-                .from('leads')
-                .select('*')
-                .eq('tenant_email', user?.email)
-                .order('created_at', { ascending: false });
+            const result = await getTenantLeads(user?.email);
 
-            if (data) {
-                setRequests(data);
+            if (result.success && result.data) {
+                setRequests(result.data);
             }
-            if (error) throw error;
+            if (!result.success) throw new Error(result.error);
         } catch (error) {
             console.error('Error fetching requests:', error);
         } finally {
@@ -70,26 +66,32 @@ const MyRequestsScreen = ({ navigation }) => {
     };
 
     const handleManage = (request) => {
-        Alert.alert(
-            'Manage Request',
-            'What would you like to do?',
-            [
-                { text: 'View Details', onPress: () => Alert.alert('Request Details', `Location: ${request.location || 'N/A'}\nType: ${request.property_type || 'N/A'}\nBudget: ${request.budget || 'N/A'}\nStatus: ${request.status || 'N/A'}`) },
-                { text: request.status === 'active' ? 'Pause' : 'Activate', onPress: () => toggleStatus(request) },
-                { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(request) },
-                { text: 'Cancel', style: 'cancel' },
-            ]
+        const actions = [
+            { text: 'View Details', onPress: () => Alert.alert('Request Details', `Location: ${request.location || 'N/A'}\nType: ${request.property_type || 'N/A'}\nBudget: ${request.budget || 'N/A'}\nStatus: ${request.status || 'N/A'}`) },
+            { text: request.status === 'active' ? 'Pause' : 'Activate', onPress: () => toggleStatus(request) },
+        ];
+
+        // Add Rate Agent option for completed/converted leads
+        if (request.status === 'converted' || request.status === 'completed') {
+            actions.push({
+                text: 'Rate Agent',
+                onPress: () => navigation.navigate('SubmitRating', { leadId: request.id }),
+            });
+        }
+
+        actions.push(
+            { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(request) },
+            { text: 'Cancel', style: 'cancel' }
         );
+
+        Alert.alert('Manage Request', 'What would you like to do?', actions);
     };
 
     const toggleStatus = async (request) => {
         const newStatus = request.status === 'active' ? 'paused' : 'active';
         try {
-            const { error } = await supabase
-                .from('leads')
-                .update({ status: newStatus })
-                .eq('id', request.id);
-            if (error) throw error;
+            const result = await updateLeadStatus(request.id, newStatus);
+            if (!result.success) throw new Error(result.error);
             fetchRequests();
             toast.success('Status updated successfully');
         } catch (error) {
@@ -111,11 +113,8 @@ const MyRequestsScreen = ({ navigation }) => {
 
     const deleteRequest = async (request) => {
         try {
-            const { error } = await supabase
-                .from('leads')
-                .delete()
-                .eq('id', request.id);
-            if (error) throw error;
+            const result = await deleteLead(request.id);
+            if (!result.success) throw new Error(result.error);
             fetchRequests();
             toast.success('Request deleted successfully');
         } catch (error) {

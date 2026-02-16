@@ -43,7 +43,23 @@ import LanguageScreen from '../screens/settings/LanguageScreen';
 
 // Support Screens
 import SupportScreen from '../screens/support/SupportScreen';
+import TicketListScreen from '../screens/support/TicketListScreen';
+import TicketDetailScreen from '../screens/support/TicketDetailScreen';
+import CreateTicketScreen from '../screens/support/CreateTicketScreen';
 
+// New Feature Screens
+import AgentRatingsScreen from '../screens/agent/AgentRatingsScreen';
+import SubmitRatingScreen from '../screens/agent/SubmitRatingScreen';
+import PropertyListScreen from '../screens/agent/PropertyListScreen';
+import CreatePropertyScreen from '../screens/agent/CreatePropertyScreen';
+import SubscriptionScreen from '../screens/agent/SubscriptionScreen';
+import VouchersScreen from '../screens/agent/VouchersScreen';
+import BadLeadReportScreen from '../screens/agent/BadLeadReportScreen';
+import AgentBrowseScreen from '../screens/tenant/AgentBrowseScreen';
+import AgentProfileViewScreen from '../screens/tenant/AgentProfileViewScreen';
+
+import { getUnreadNotificationCount, subscribeToNotifications } from '../lib/notificationService';
+import { useAuth as useAuthForBadge } from '../context/AuthContext';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -51,17 +67,37 @@ const Tab = createBottomTabNavigator();
 const AgentTabBar = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { user } = useAuthForBadge();
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let unsub;
+    const load = async () => {
+      const result = await getUnreadNotificationCount(user.id);
+      if (result.success) setUnreadCount(result.data || 0);
+      unsub = subscribeToNotifications(user.id, () => {
+        getUnreadNotificationCount(user.id).then(r => {
+          if (r.success) setUnreadCount(r.data || 0);
+        });
+      });
+    };
+    load();
+    return () => { if (unsub) unsub(); };
+  }, [user?.id]);
 
   const renderTab = (route, index) => {
     const isFocused = state.index === index;
 
     let iconName;
     let label;
+    let showBadge = false;
 
     switch (route.name) {
       case 'AgentLeads':
         iconName = 'grid';
         label = 'Dash';
+        showBadge = unreadCount > 0;
         break;
       case 'AgentProperties':
         iconName = 'home';
@@ -115,6 +151,15 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
             size={20}
             color={isFocused ? colors.primary : colors.textSecondary}
           />
+          {showBadge && (
+            <View style={styles.badgeDot}>
+              {unreadCount > 0 && unreadCount <= 99 ? (
+                <Text style={styles.badgeText}>{unreadCount}</Text>
+              ) : unreadCount > 99 ? (
+                <Text style={styles.badgeText}>99+</Text>
+              ) : null}
+            </View>
+          )}
         </View>
         <Text style={[
           styles.agentTabLabel,
@@ -324,6 +369,41 @@ const TenantMainStack = () => {
         component={LanguageScreen}
         options={{ animation: 'slide_from_right' }}
       />
+      <Stack.Screen
+        name="AgentBrowse"
+        component={AgentBrowseScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentProfileView"
+        component={AgentProfileViewScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentRatings"
+        component={AgentRatingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="SubmitRating"
+        component={SubmitRatingScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="TicketList"
+        component={TicketListScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="TicketDetail"
+        component={TicketDetailScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="CreateTicket"
+        component={CreateTicketScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
     </Stack.Navigator>
   );
 };
@@ -396,6 +476,66 @@ const AgentMainStack = () => {
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="TicketList"
+        component={TicketListScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="TicketDetail"
+        component={TicketDetailScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="CreateTicket"
+        component={CreateTicketScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="AgentRatings"
+        component={AgentRatingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="PropertyList"
+        component={PropertyListScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="CreateProperty"
+        component={CreatePropertyScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="Vouchers"
+        component={VouchersScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="BadLeadReport"
+        component={BadLeadReportScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="SubmitRating"
+        component={SubmitRatingScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="AgentProfileView"
+        component={AgentProfileViewScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="AgentBrowse"
+        component={AgentBrowseScreen}
         options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>
@@ -547,6 +687,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'DMSans_500Medium',
     marginTop: 2,
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontFamily: 'DMSans_600SemiBold',
+    color: '#FFFFFF',
   },
 });
 
