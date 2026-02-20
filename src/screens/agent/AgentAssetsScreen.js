@@ -20,7 +20,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
@@ -129,7 +129,14 @@ const AgentAssetsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const { user, userData } = useAuth();
-    const videoRef = useRef(null);
+
+    // Video player for preview
+    const [videoUri, setVideoUri] = useState(null);
+    const videoPlayer = useVideoPlayer(videoUri, player => {
+        if (player && videoUri) {
+            player.play();
+        }
+    });
 
     // States
     const [loading, setLoading] = useState(true);
@@ -552,7 +559,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                             }
 
                             const result = await ImagePicker.launchImageLibraryAsync({
-                                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                                mediaTypes: ['images', 'videos'],
                                 allowsEditing: false,
                                 quality: 0.8,
                             });
@@ -595,7 +602,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                             }
 
                             const result = await ImagePicker.launchCameraAsync({
-                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                mediaTypes: ['images'],
                                 quality: 0.8,
                             });
 
@@ -730,6 +737,11 @@ const AgentAssetsScreen = ({ navigation }) => {
 
         if (type === 'image' || type === 'video') {
             setSelectedAsset(asset);
+            if (type === 'video') {
+                setVideoUri(url);
+            } else {
+                setVideoUri(null);
+            }
             setPreviewModalVisible(true);
         } else if (type === 'pdf' || type === 'doc') {
             // Open document in browser or native viewer
@@ -1060,8 +1072,9 @@ const AgentAssetsScreen = ({ navigation }) => {
                 presentationStyle="fullScreen"
                 onRequestClose={() => {
                     setPreviewModalVisible(false);
-                    if (videoRef.current) {
-                        videoRef.current.pauseAsync().catch(() => {});
+                    setVideoUri(null);
+                    if (videoPlayer) {
+                        try { videoPlayer.pause(); } catch (e) {}
                     }
                 }}
             >
@@ -1071,8 +1084,9 @@ const AgentAssetsScreen = ({ navigation }) => {
                         style={[styles.previewClose, { top: insets.top + 10 }]}
                         onPress={() => {
                             setPreviewModalVisible(false);
-                            if (videoRef.current) {
-                                videoRef.current.pauseAsync().catch(() => {});
+                            setVideoUri(null);
+                            if (videoPlayer) {
+                                try { videoPlayer.pause(); } catch (e) {}
                             }
                         }}
                     >
@@ -1117,21 +1131,12 @@ const AgentAssetsScreen = ({ navigation }) => {
                             </View>
                         ) : type === 'video' ? (
                             <View style={styles.previewMediaContainer}>
-                                <Video
-                                    ref={videoRef}
-                                    source={{ uri: selectedAsset.file_url }}
+                                <VideoView
+                                    player={videoPlayer}
                                     style={styles.previewVideo}
-                                    useNativeControls
-                                    resizeMode={ResizeMode.CONTAIN}
-                                    shouldPlay
-                                    isLooping={false}
-                                    onLoad={() => setMediaLoading(false)}
+                                    contentFit="contain"
+                                    nativeControls
                                     onReadyForDisplay={() => setMediaLoading(false)}
-                                    onError={(error) => {
-                                        console.error('Video playback error:', error);
-                                        setMediaLoading(false);
-                                        setMediaError(true);
-                                    }}
                                 />
                                 {mediaLoading && (
                                     <View style={styles.previewLoadingOverlay}>

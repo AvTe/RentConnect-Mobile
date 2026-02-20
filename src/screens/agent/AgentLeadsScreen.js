@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    TextInput,
     RefreshControl,
     ActivityIndicator,
     Alert,
@@ -13,7 +12,6 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -60,6 +58,13 @@ const AgentLeadsScreen = ({ navigation }) => {
     const [creditBalance, setCreditBalance] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [totalLeads, setTotalLeads] = useState(0);
+
+    const activeLeads = useMemo(() => {
+        return leads.filter(lead => {
+            const state = getLeadState(lead, unlockedLeadIds.has(lead.id));
+            return state !== 'expired' && state !== 'sold_out';
+        }).length;
+    }, [leads, unlockedLeadIds]);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -412,29 +417,6 @@ const AgentLeadsScreen = ({ navigation }) => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
-            {/* Fixed Top Header - yoombaa logo and icons */}
-            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                <View style={styles.headerLeft}>
-                    <Feather name="home" size={24} color={colors.primary} />
-                    <Text style={[styles.logoText, { color: colors.text }]}>yoombaa</Text>
-                </View>
-                <View style={styles.headerRight}>
-                    <TouchableOpacity
-                        style={[styles.headerIconBtn, { backgroundColor: colors.background }]}
-                        onPress={() => navigation.navigate('Notifications')}
-                    >
-                        <Feather name="bell" size={22} color={colors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.avatarButton, { backgroundColor: colors.primaryLight }]}
-                        onPress={() => navigation.navigate('AgentProfileEdit')}
-                    >
-                        <Feather name="user" size={18} color={colors.primary} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Scrollable Content */}
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -447,58 +429,102 @@ const AgentLeadsScreen = ({ navigation }) => {
                     />
                 }
             >
-                {/* Greeting Section - Now scrolls */}
-                <LinearGradient
-                    colors={[colors.primaryLight, colors.background]}
-                    style={styles.greetingSection}
-                >
-                    <Text style={styles.greetingText}>{getGreeting()}</Text>
-                    <Text style={styles.greetingName}>{getUserName()}!</Text>
-                </LinearGradient>
-
-                {/* Leads Dashboard Header - Now scrolls */}
-                <View style={styles.dashboardHeader}>
-                    <View>
-                        <Text style={styles.dashboardTitle}>Leads Dashboard</Text>
-                        <Text style={styles.dashboardSubtitle}>
-                            {filteredLeads.length} leads available{' '}
-                            <Text style={styles.filterHighlight}>(filtered from {totalLeads})</Text>
-                        </Text>
+                {/* Header — scrolls with page */}
+                <View style={[styles.header, { backgroundColor: colors.card }]}>
+                    <View style={styles.headerTop}>
+                        <View style={styles.headerLeft}>
+                            <Feather name="home" size={22} color={colors.primary} />
+                            <Text style={[styles.logoText, { color: colors.text }]}>yoombaa</Text>
+                        </View>
+                        <View style={styles.headerRight}>
+                            <TouchableOpacity
+                                style={[styles.headerIconBtn, { backgroundColor: colors.background }]}
+                                onPress={() => navigation.navigate('Notifications')}
+                            >
+                                <Feather name="bell" size={20} color={colors.text} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.avatarButton, { backgroundColor: colors.primaryLight }]}
+                                onPress={() => navigation.navigate('AgentProfileEdit')}
+                            >
+                                <Feather name="user" size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
+
+                    {/* Search bar in header area */}
                     <TouchableOpacity
-                        style={styles.filterButton}
-                        onPress={() => navigation.navigate('LeadFilters')}
+                        style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}
+                        activeOpacity={0.7}
+                        onPress={() => navigation.navigate('LeadSearch')}
                     >
-                        <Feather name="sliders" size={20} color={COLORS.text} />
+                        <Feather name="search" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.searchPlaceholder, { color: colors.textSecondary }]}>
+                            Search leads...
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Search Bar - Now scrolls */}
-                <View style={styles.searchContainer}>
-                    <Feather name="search" size={18} color={COLORS.textSecondary} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search leads..."
-                        placeholderTextColor={COLORS.textSecondary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
+                {/* Hero — Active Leads + Credits only */}
+                <View style={[styles.heroSection, { backgroundColor: colors.card }]}>
+                    <View style={styles.heroRow}>
+                        <View style={styles.heroCard}>
+                            <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(254, 146, 0, 0.10)' }]}>
+                                <Feather name="zap" size={18} color={COLORS.primary} />
+                            </View>
+                            <Text style={[styles.heroValue, { color: colors.text }]}>{activeLeads}</Text>
+                            <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Active Leads</Text>
+                        </View>
+                        <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
+                        <TouchableOpacity style={styles.heroCard} onPress={() => navigation.navigate('AgentWallet')} activeOpacity={0.7}>
+                            <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.10)' }]}>
+                                <Feather name="credit-card" size={18} color={COLORS.success} />
+                            </View>
+                            <Text style={[styles.heroValue, { color: colors.text }]}>{creditBalance}</Text>
+                            <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Credits</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Leads Section Header */}
+                <View style={styles.sectionHeader}>
+                    <View>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Leads</Text>
+                        <View style={styles.leadCountRow}>
+                            <Text style={[styles.leadCountText, { color: colors.textSecondary }]}>
+                                {totalLeads} total
+                            </Text>
+                            <View style={[styles.countDot, { backgroundColor: colors.border }]} />
+                            <Text style={[styles.leadCountText, { color: COLORS.primary }]}>
+                                {activeLeads} active
+                            </Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.filterButton, { borderColor: colors.border }]}
+                        onPress={() => navigation.navigate('LeadFilters')}
+                    >
+                        <Feather name="sliders" size={14} color={colors.textSecondary} />
+                        <Text style={[styles.filterBtnText, { color: colors.textSecondary }]}>Filter</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Leads List */}
-                {filteredLeads.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Feather name="inbox" size={48} color={COLORS.textSecondary} />
-                        <Text style={styles.emptyTitle}>No leads found</Text>
-                        <Text style={styles.emptyText}>
-                            {searchQuery ? 'Try adjusting your search' : 'New leads will appear here'}
-                        </Text>
-                    </View>
-                ) : (
-                    filteredLeads.map((lead) => (
-                        <LeadCard key={lead.id} lead={lead} />
-                    ))
-                )}
+                <View style={styles.leadsList}>
+                    {filteredLeads.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Feather name="inbox" size={48} color={COLORS.textSecondary} />
+                            <Text style={styles.emptyTitle}>No leads found</Text>
+                            <Text style={styles.emptyText}>
+                                {searchQuery ? 'Try adjusting your search' : 'New leads will appear here'}
+                            </Text>
+                        </View>
+                    ) : (
+                        filteredLeads.map((lead) => (
+                            <LeadCard key={lead.id} lead={lead} />
+                        ))
+                    )}
+                </View>
 
                 <View style={{ height: 100 }} />
             </ScrollView>
@@ -523,14 +549,14 @@ const styles = StyleSheet.create({
     },
     // Header
     header: {
+        paddingHorizontal: 20,
+        paddingTop: 14,
+        paddingBottom: 14,
+    },
+    headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-        backgroundColor: COLORS.card,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
     },
     headerLeft: {
         flexDirection: 'row',
@@ -539,104 +565,133 @@ const styles = StyleSheet.create({
     logoText: {
         fontSize: 20,
         fontFamily: 'DMSans_700Bold',
-        color: COLORS.primary,
         marginLeft: 6,
     },
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
     },
     headerIconBtn: {
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
     },
     avatarButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.primaryLight,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
+        borderWidth: 1.5,
         borderColor: COLORS.primary,
     },
-    // Greeting
-    greetingSection: {
-        paddingHorizontal: 20,
-        paddingVertical: 24,
-        alignItems: 'center',
-    },
-    greetingText: {
-        fontSize: 24,
-        fontFamily: 'DMSans_500Medium',
-        color: COLORS.text,
-    },
-    greetingName: {
-        fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
-        color: COLORS.text,
-    },
-    // Dashboard Header
-    dashboardHeader: {
+    // Search bar (in header)
+    searchBar: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 12,
-        backgroundColor: COLORS.card,
+        alignItems: 'center',
+        marginTop: 14,
+        height: 42,
+        borderRadius: 21,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        gap: 10,
     },
-    dashboardTitle: {
-        fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
-        color: COLORS.text,
-    },
-    dashboardSubtitle: {
+    searchPlaceholder: {
+        flex: 1,
         fontSize: 14,
         fontFamily: 'DMSans_400Regular',
-        color: COLORS.textSecondary,
-        marginTop: 2,
     },
-    filterHighlight: {
-        color: COLORS.primary,
+    // Hero
+    heroSection: {
+        marginTop: 8,
+        marginHorizontal: 20,
+        borderRadius: 16,
+        overflow: 'hidden',
     },
-    filterButton: {
+    heroRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 20,
+        paddingHorizontal: 8,
+    },
+    heroCard: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 6,
+    },
+    heroIconWrap: {
         width: 40,
         height: 40,
         borderRadius: 12,
-        backgroundColor: COLORS.background,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        marginBottom: 2,
     },
-    // Search
-    searchContainer: {
+    heroValue: {
+        fontSize: 28,
+        fontFamily: 'DMSans_700Bold',
+        lineHeight: 32,
+    },
+    heroLabel: {
+        fontSize: 12,
+        fontFamily: 'DMSans_500Medium',
+    },
+    heroDivider: {
+        width: 1,
+        height: 60,
+        marginHorizontal: 4,
+    },
+    // Section Header
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginTop: 20,
+        marginBottom: 14,
+    },
+    sectionTitle: {
+        fontSize: 17,
+        fontFamily: 'DMSans_700Bold',
+    },
+    leadCountRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.card,
-        marginHorizontal: 20,
-        marginVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: 30,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        height: 48,
+        gap: 8,
+        marginTop: 3,
     },
-    searchInput: {
-        flex: 1,
-        marginLeft: 10,
-        fontSize: 15,
+    leadCountText: {
+        fontSize: 13,
         fontFamily: 'DMSans_400Regular',
-        color: COLORS.text,
+    },
+    countDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+    },
+    filterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 20,
+        borderWidth: 1,
+    },
+    filterBtnText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_500Medium',
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
+        paddingBottom: 20,
+    },
+    leadsList: {
         paddingHorizontal: 20,
     },
     emptyState: {

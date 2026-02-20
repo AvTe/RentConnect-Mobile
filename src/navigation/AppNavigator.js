@@ -36,6 +36,7 @@ import BuyCreditsScreen from '../screens/agent/BuyCreditsScreen';
 import NotificationsScreen from '../screens/agent/NotificationsScreen';
 import AgentProfileEditScreen from '../screens/agent/AgentProfileEditScreen';
 import LeadFiltersScreen from '../screens/agent/LeadFiltersScreen';
+import LeadSearchScreen from '../screens/agent/LeadSearchScreen';
 
 // Profile & Settings Screens
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -464,6 +465,16 @@ const AgentMainStack = () => {
         name="LeadFilters"
         component={LeadFiltersScreen}
         options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="LeadSearch"
+        component={LeadSearchScreen}
+        options={{
+          animation: 'fade',
+          animationDuration: 200,
+          presentation: 'transparentModal',
+          headerShown: false,
+        }}
       />
       <Stack.Screen
         name="Profile"

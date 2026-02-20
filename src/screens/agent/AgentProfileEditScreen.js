@@ -45,7 +45,6 @@ const AgentProfileEditScreen = ({ navigation }) => {
         email: '',
         phone: '',
         agencyName: '',
-        agencyAddress: '',
         bio: '',
         experience: '',
         specialization: '',
@@ -58,7 +57,6 @@ const AgentProfileEditScreen = ({ navigation }) => {
                 email: userData.email || user?.email || '',
                 phone: userData.phone || '',
                 agencyName: userData.agency_name || userData.agencyName || '',
-                agencyAddress: userData.agency_address || '',
                 bio: userData.bio || '',
                 experience: userData.experience?.toString() || '',
                 specialization: userData.specialization || '',
@@ -80,7 +78,7 @@ const AgentProfileEditScreen = ({ navigation }) => {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.8,
@@ -105,7 +103,6 @@ const AgentProfileEditScreen = ({ navigation }) => {
                 name: formData.name.trim(),
                 phone: formData.phone.trim(),
                 agency_name: formData.agencyName.trim(),
-                agency_address: formData.agencyAddress.trim(),
                 bio: formData.bio.trim(),
                 experience: formData.experience ? parseInt(formData.experience) : null,
                 specialization: formData.specialization.trim(),
@@ -244,13 +241,6 @@ const AgentProfileEditScreen = ({ navigation }) => {
                         value={formData.agencyName}
                         onChangeText={(val) => handleInputChange('agencyName', val)}
                         placeholder="Your agency or company name"
-                    />
-
-                    <InputField
-                        label="Agency Address"
-                        value={formData.agencyAddress}
-                        onChangeText={(val) => handleInputChange('agencyAddress', val)}
-                        placeholder="Office address"
                     />
 
                     <InputField
