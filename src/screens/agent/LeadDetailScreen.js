@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,9 +8,15 @@ import {
     ActivityIndicator,
     Alert,
     Linking,
+    Share,
+    Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
+import * as ExpoLinking from 'expo-linking';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -22,7 +28,9 @@ import {
     hasAgentUnlockedLead,
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
+import { checkAgentLeadConnection, updateLeadOutcome, recordLeadContact } from '../../lib/leadConnectionService';
 import { getWalletBalance } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 const COLORS = {
     primary: '#FE9200',
@@ -52,6 +60,11 @@ const LeadDetailScreen = ({ route, navigation }) => {
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [creditBalance, setCreditBalance] = useState(0);
     const [unlocking, setUnlocking] = useState(false);
+    const [connectionId, setConnectionId] = useState(null);
+    const [leadOutcome, setLeadOutcome] = useState(null);
+    const [updatingOutcome, setUpdatingOutcome] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const shareCardRef = useRef(null);
 
     const fetchLeadDetails = useCallback(async () => {
         if (!leadId || !user?.id) {
@@ -69,8 +82,30 @@ const LeadDetailScreen = ({ route, navigation }) => {
 
             // Check if unlocked via service layer
             const unlocked = await hasAgentUnlockedLead(user.id, leadId);
-
             setIsUnlocked(!!unlocked);
+
+            // Fetch connection details for outcome tracking
+            if (unlocked) {
+                try {
+                    const connResult = await checkAgentLeadConnection(leadId, user.id);
+                    if (connResult.success && connResult.connected) {
+                        // Try to get connection row ID for outcome tracking
+                        const { data: connData } = await supabase
+                            .from('lead_agent_connections')
+                            .select('id, status, outcome')
+                            .eq('lead_id', leadId)
+                            .eq('agent_id', user.id)
+                            .maybeSingle();
+                        if (connData) {
+                            setConnectionId(connData.id);
+                            setLeadOutcome(connData.outcome || connData.status);
+                        }
+                    }
+                } catch (e) {
+                    // Non-critical — outcome tracking is optional
+                    console.log('Could not fetch connection for outcome tracking:', e);
+                }
+            }
 
             // Fetch credit balance
             const balanceResult = await getWalletBalance(user.id);
@@ -159,6 +194,67 @@ const LeadDetailScreen = ({ route, navigation }) => {
         return `KSh ${budget.toLocaleString()}`;
     };
 
+    const getLeadDeepLink = useCallback(() => {
+        if (!lead?.id) return '';
+        return `https://yoombaa.com/lead/${lead.id}`;
+    }, [lead?.id]);
+
+    const handleShare = async () => {
+        if (!lead || sharing) return;
+        setSharing(true);
+
+        try {
+            // Capture the hidden preview card as an image
+            const uri = await shareCardRef.current.capture({
+                format: 'png',
+                quality: 1,
+                result: 'tmpfile',
+            });
+
+            const leadLink = getLeadDeepLink();
+
+            // Clean, minimal caption — lead details are already in the preview image.
+            // Only include a short CTA and the clickable HTTPS link.
+            const shareCaption = `\ud83c\udfe0 Tenant Lead on Yoombaa\n\nView lead details: ${leadLink}`;
+
+            if (Platform.OS === 'ios') {
+                // iOS: Share.share supports url (image) + message (caption) together
+                await Share.share({
+                    message: shareCaption,
+                    url: uri,
+                    title: 'Yoombaa Lead',
+                });
+            } else {
+                // Android: Copy the clickable link to clipboard, share the image,
+                // user can paste the link as caption in WhatsApp/Telegram.
+                await Clipboard.setStringAsync(shareCaption);
+                toast.info('Link copied! Paste as caption when sharing.');
+
+                const isAvailable = await Sharing.isAvailableAsync();
+                if (isAvailable) {
+                    await Sharing.shareAsync(uri, {
+                        mimeType: 'image/png',
+                        dialogTitle: 'Share Lead',
+                        UTI: 'public.png',
+                    });
+                } else {
+                    // Fallback: share text with clickable link
+                    await Share.share({
+                        message: shareCaption,
+                        title: 'Yoombaa Lead',
+                    });
+                }
+            }
+        } catch (error) {
+            if (error?.message !== 'User did not share') {
+                console.error('Share error:', error);
+                toast.error('Failed to share lead');
+            }
+        } finally {
+            setSharing(false);
+        }
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
@@ -202,8 +298,12 @@ const LeadDetailScreen = ({ route, navigation }) => {
                     <Feather name="arrow-left" size={24} color={COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Lead Details</Text>
-                <TouchableOpacity style={styles.shareButton}>
-                    <Feather name="share-2" size={20} color={COLORS.text} />
+                <TouchableOpacity style={styles.shareButton} onPress={handleShare} disabled={sharing}>
+                    {sharing ? (
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                    ) : (
+                        <Feather name="share-2" size={20} color={COLORS.text} />
+                    )}
                 </TouchableOpacity>
             </View>
 
@@ -360,6 +460,85 @@ const LeadDetailScreen = ({ route, navigation }) => {
                     </View>
                 )}
 
+                {/* Lead Outcome Tracking — matches web */}
+                {isUnlocked && connectionId && (
+                    <View style={styles.outcomeCard}>
+                        <Text style={styles.outcomeTitle}>Lead Outcome</Text>
+                        <Text style={styles.outcomeDesc}>
+                            Track what happened with this lead for your pipeline analytics.
+                        </Text>
+                        {leadOutcome === 'converted' || leadOutcome === 'lost' ? (
+                            <View style={[styles.outcomeBadge, leadOutcome === 'converted' ? styles.outcomeBadgeConverted : styles.outcomeBadgeLost]}>
+                                <Feather
+                                    name={leadOutcome === 'converted' ? 'check-circle' : 'x-circle'}
+                                    size={16}
+                                    color={leadOutcome === 'converted' ? COLORS.success : COLORS.error}
+                                />
+                                <Text style={[styles.outcomeBadgeText, { color: leadOutcome === 'converted' ? COLORS.success : COLORS.error }]}>
+                                    {leadOutcome === 'converted' ? 'Converted' : 'Lost'}
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.outcomeActions}>
+                                <TouchableOpacity
+                                    style={styles.outcomeConvertedBtn}
+                                    disabled={updatingOutcome}
+                                    onPress={async () => {
+                                        setUpdatingOutcome(true);
+                                        const res = await updateLeadOutcome(connectionId, 'converted', '');
+                                        setUpdatingOutcome(false);
+                                        if (res.success) {
+                                            setLeadOutcome('converted');
+                                            toast.success('Lead marked as converted!');
+                                        } else {
+                                            toast.error('Failed to update outcome');
+                                        }
+                                    }}
+                                >
+                                    {updatingOutcome ? (
+                                        <ActivityIndicator size="small" color={COLORS.success} />
+                                    ) : (
+                                        <>
+                                            <Feather name="check-circle" size={16} color={COLORS.success} />
+                                            <Text style={styles.outcomeConvertedText}>Converted</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.outcomeLostBtn}
+                                    disabled={updatingOutcome}
+                                    onPress={async () => {
+                                        Alert.alert(
+                                            'Mark as Lost',
+                                            'Are you sure this lead did not convert?',
+                                            [
+                                                { text: 'Cancel', style: 'cancel' },
+                                                {
+                                                    text: 'Confirm',
+                                                    onPress: async () => {
+                                                        setUpdatingOutcome(true);
+                                                        const res = await updateLeadOutcome(connectionId, 'lost', '');
+                                                        setUpdatingOutcome(false);
+                                                        if (res.success) {
+                                                            setLeadOutcome('lost');
+                                                            toast.info('Lead marked as lost');
+                                                        } else {
+                                                            toast.error('Failed to update outcome');
+                                                        }
+                                                    },
+                                                },
+                                            ]
+                                        );
+                                    }}
+                                >
+                                    <Feather name="x-circle" size={16} color={COLORS.error} />
+                                    <Text style={styles.outcomeLostText}>Lost</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                )}
+
                 {/* Report Bad Lead */}
                 {isUnlocked && (
                     <TouchableOpacity
@@ -373,6 +552,103 @@ const LeadDetailScreen = ({ route, navigation }) => {
 
                 <View style={{ height: 120 }} />
             </ScrollView>
+
+            {/* Hidden Share Preview Card — captured by ViewShot */}
+            <ViewShot
+                ref={shareCardRef}
+                options={{ format: 'png', quality: 1 }}
+                style={styles.shareCardWrapper}
+            >
+                <View style={styles.shareCard}>
+                    {/* Top accent bar */}
+                    <View style={styles.shareCardAccent} />
+
+                    {/* Header with branding */}
+                    <View style={styles.shareCardHeader}>
+                        <View style={styles.shareCardLogoCircle}>
+                            <Text style={styles.shareCardLogoText}>Y</Text>
+                        </View>
+                        <View>
+                            <Text style={styles.shareCardBrand}>YOOMBAA</Text>
+                            <Text style={styles.shareCardSubbrand}>Tenant Lead</Text>
+                        </View>
+                    </View>
+
+                    {/* Main content */}
+                    <View style={styles.shareCardBody}>
+                        <Text style={styles.shareCardLabel}>Looking for</Text>
+                        <Text style={styles.shareCardPropertyType}>
+                            {lead?.property_type || lead?.requirements?.property_type || 'Property'}
+                        </Text>
+
+                        <View style={styles.shareCardLocationRow}>
+                            <View style={styles.shareCardLocationIcon}>
+                                <Feather name="map-pin" size={14} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.shareCardLocation}>
+                                {lead?.location || lead?.requirements?.location || 'Location TBD'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Info pills */}
+                    <View style={styles.shareCardPills}>
+                        {(lead?.budget || lead?.requirements?.budget) ? (
+                            <View style={styles.shareCardPill}>
+                                <Feather name="dollar-sign" size={12} color={COLORS.primary} />
+                                <Text style={styles.shareCardPillText}>
+                                    KSh {Number(lead?.budget || lead?.requirements?.budget).toLocaleString()}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {lead?.move_in_date ? (
+                            <View style={styles.shareCardPill}>
+                                <Feather name="calendar" size={12} color={COLORS.primary} />
+                                <Text style={styles.shareCardPillText}>
+                                    {formatDate(lead.move_in_date)}
+                                </Text>
+                            </View>
+                        ) : null}
+                        <View style={styles.shareCardPill}>
+                            <Feather name="users" size={12} color={COLORS.primary} />
+                            <Text style={styles.shareCardPillText}>
+                                {lead?.claimed_slots || 0}/{lead?.max_slots || 3} Slots
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Tenant name (first name only for privacy) */}
+                    <View style={styles.shareCardTenantRow}>
+                        <View style={styles.shareCardAvatar}>
+                            <Text style={styles.shareCardAvatarText}>
+                                {(lead?.tenant_name || 'T').charAt(0).toUpperCase()}
+                            </Text>
+                        </View>
+                        <Text style={styles.shareCardTenantName}>
+                            {(lead?.tenant_name || 'Tenant').split(' ')[0]}
+                        </Text>
+                        {lead?.phone_verified && (
+                            <View style={styles.shareCardVerified}>
+                                <Feather name="check-circle" size={10} color={COLORS.success} />
+                                <Text style={styles.shareCardVerifiedText}>Verified</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Deep Link URL */}
+                    <View style={styles.shareCardLinkRow}>
+                        <Feather name="link" size={12} color={COLORS.primary} />
+                        <Text style={styles.shareCardLinkText} numberOfLines={1}>
+                            {`yoombaa.com/lead/${lead?.id?.substring(0, 8) || ''}...`}
+                        </Text>
+                    </View>
+
+                    {/* Footer CTA */}
+                    <View style={styles.shareCardFooter}>
+                        <Text style={styles.shareCardCTA}>Open in Yoombaa App</Text>
+                    </View>
+                </View>
+            </ViewShot>
 
             {/* Bottom Action Bar */}
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -862,6 +1138,253 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontFamily: 'DMSans_600SemiBold',
         color: COLORS.primary,
+    },
+    // Lead Outcome Tracking
+    outcomeCard: {
+        backgroundColor: COLORS.card,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    outcomeTitle: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    outcomeDesc: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginBottom: 12,
+    },
+    outcomeActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    outcomeConvertedBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        height: 44,
+        backgroundColor: COLORS.successLight,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    outcomeConvertedText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.success,
+    },
+    outcomeLostBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        height: 44,
+        backgroundColor: '#FEF2F2',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
+    },
+    outcomeLostText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.error,
+    },
+    outcomeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        height: 44,
+        borderRadius: 12,
+    },
+    outcomeBadgeConverted: {
+        backgroundColor: COLORS.successLight,
+    },
+    outcomeBadgeLost: {
+        backgroundColor: '#FEF2F2',
+    },
+    outcomeBadgeText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+    },
+    // Share Preview Card (rendered off-screen, captured by ViewShot)
+    shareCardWrapper: {
+        position: 'absolute',
+        left: -9999,
+        top: -9999,
+        width: 400,
+    },
+    shareCard: {
+        width: 400,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    shareCardAccent: {
+        height: 6,
+        backgroundColor: COLORS.primary,
+    },
+    shareCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        paddingBottom: 8,
+        gap: 12,
+    },
+    shareCardLogoCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    shareCardLogoText: {
+        fontSize: 20,
+        fontFamily: 'DMSans_700Bold',
+        color: '#FFFFFF',
+    },
+    shareCardBrand: {
+        fontSize: 16,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+        letterSpacing: 1.5,
+    },
+    shareCardSubbrand: {
+        fontSize: 11,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
+    },
+    shareCardBody: {
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        paddingBottom: 12,
+    },
+    shareCardLabel: {
+        fontSize: 12,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
+        marginBottom: 2,
+    },
+    shareCardPropertyType: {
+        fontSize: 26,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+        marginBottom: 10,
+    },
+    shareCardLocationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    shareCardLocationIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: COLORS.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    shareCardLocation: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+    },
+    shareCardPills: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 24,
+        paddingBottom: 16,
+        gap: 8,
+    },
+    shareCardPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: COLORS.primaryLight,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    shareCardPillText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+    },
+    shareCardTenantRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingBottom: 16,
+        gap: 8,
+    },
+    shareCardAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: COLORS.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: COLORS.primary,
+    },
+    shareCardAvatarText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.primary,
+    },
+    shareCardTenantName: {
+        fontSize: 14,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+    },
+    shareCardVerified: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: COLORS.successLight,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    shareCardVerifiedText: {
+        fontSize: 10,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.success,
+    },
+    shareCardLinkRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingBottom: 14,
+        gap: 6,
+    },
+    shareCardLinkText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.primary,
+        flex: 1,
+    },
+    shareCardFooter: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: 14,
+        alignItems: 'center',
+    },
+    shareCardCTA: {
+        fontSize: 14,
+        fontFamily: 'DMSans_700Bold',
+        color: '#FFFFFF',
+        letterSpacing: 0.5,
     },
 });
 

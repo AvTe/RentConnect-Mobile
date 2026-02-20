@@ -13,7 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yoombaa.app"
+      "bundleIdentifier": "com.yoombaa.app",
+      "associatedDomains": ["applinks:yoombaa.com", "applinks:www.yoombaa.com"]
     },
     "android": {
       "adaptiveIcon": {
@@ -30,6 +31,41 @@
               "scheme": "yoombaa",
               "host": "auth",
               "pathPrefix": "/callback"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "yoombaa",
+              "host": "*",
+              "pathPrefix": "/lead"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "yoombaa.com",
+              "pathPrefix": "/lead"
+            },
+            {
+              "scheme": "https",
+              "host": "www.yoombaa.com",
+              "pathPrefix": "/lead"
             }
           ],
           "category": [

@@ -8,6 +8,7 @@ import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 
 // Auth Screens
 import LandingScreen from '../screens/LandingScreen';
@@ -57,6 +58,7 @@ import VouchersScreen from '../screens/agent/VouchersScreen';
 import BadLeadReportScreen from '../screens/agent/BadLeadReportScreen';
 import AgentBrowseScreen from '../screens/tenant/AgentBrowseScreen';
 import AgentProfileViewScreen from '../screens/tenant/AgentProfileViewScreen';
+import SavedPropertiesScreen from '../screens/tenant/SavedPropertiesScreen';
 
 import { getUnreadNotificationCount, subscribeToNotifications } from '../lib/notificationService';
 import { useAuth as useAuthForBadge } from '../context/AuthContext';
@@ -404,6 +406,11 @@ const TenantMainStack = () => {
         component={CreateTicketScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
+      <Stack.Screen
+        name="SavedProperties"
+        component={SavedPropertiesScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 };
@@ -494,6 +501,11 @@ const AgentMainStack = () => {
         options={{ animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
+        name="SavedProperties"
+        component={SavedPropertiesScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="AgentRatings"
         component={AgentRatingsScreen}
         options={{ animation: 'slide_from_right' }}
@@ -540,6 +552,38 @@ const AgentMainStack = () => {
       />
     </Stack.Navigator>
   );
+};
+
+// Deep linking configuration
+const prefix = Linking.createURL('/');
+
+const linking = {
+  prefixes: [prefix, 'yoombaa://', 'https://yoombaa.com', 'https://www.yoombaa.com'],
+  config: {
+    screens: {
+      // Auth screens (no deep links needed)
+      Landing: 'landing',
+      Login: 'login',
+      // Agent stack screens
+      AgentTabs: {
+        screens: {
+          AgentLeads: 'agent/leads',
+        },
+      },
+      LeadDetail: {
+        path: 'lead/:leadId',
+        parse: {
+          leadId: (leadId) => leadId,
+        },
+      },
+      // Tenant stack screens
+      TenantTabs: {
+        screens: {
+          Dashboard: 'tenant/dashboard',
+        },
+      },
+    },
+  },
 };
 
 const AppNavigator = () => {
@@ -595,7 +639,7 @@ const AppNavigator = () => {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer theme={navigationTheme} linking={linking}>
       {renderMainStack()}
     </NavigationContainer>
   );

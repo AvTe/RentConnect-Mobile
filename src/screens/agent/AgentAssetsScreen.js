@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
+import { updateAgentStorageUsage } from '../../lib/agentService';
 
 const STORAGE_BUCKET = 'agent-assets';
 
@@ -294,6 +295,19 @@ const AgentAssetsScreen = ({ navigation }) => {
             });
 
             setAssets(assetsList);
+
+            // Sync storage usage to agent_storage_usage table (matches web)
+            try {
+                await updateAgentStorageUsage(user.id, {
+                    total_storage_bytes: totalUsed,
+                    image_count: imageCount,
+                    video_count: videoCount,
+                    document_count: documentCount,
+                });
+            } catch (syncError) {
+                // Non-critical — local usage display still works
+                console.log('Storage usage sync (non-critical):', syncError);
+            }
 
         } catch (error) {
             console.error('Error fetching assets:', error);

@@ -129,14 +129,41 @@ export const getLeadState = (lead, isUnlocked = false) => {
 
 /**
  * Fetch all leads for agents (with optional filters)
+ * Backward-compatible wrapper around getAllLeads
  */
 export const fetchLeads = async (filters = {}) => {
+    const result = await getAllLeads(filters);
+    // Map to legacy response shape: { success, leads, count }
+    return {
+        success: result.success,
+        leads: result.data || [],
+        count: result.data?.length || 0,
+        error: result.error,
+    };
+};
+
+/**
+ * Get all leads with full filter support + pagination
+ * Matches web: getAllLeads() in database.js
+ *
+ * @param {Object} filters
+ * @param {string} [filters.status]       - 'active'|'closed'|'all' (skip filter if 'all')
+ * @param {string} [filters.location]     - ilike substring match
+ * @param {string} [filters.propertyType] - exact match on property_type
+ * @param {string} [filters.userId]       - filter by user_id (tenant owner)
+ * @param {string} [filters.tenantId]     - alias for userId
+ * @param {number} [filters.minBudget]    - budget >= value
+ * @param {number} [filters.maxBudget]    - budget <= value
+ * @param {boolean} [filters.includeHidden] - if true, include hidden leads (admin)
+ * @param {number} [filters.limit]        - max rows returned
+ * @param {number} [filters.offset]       - skip N rows (for pagination)
+ * @returns {{ success: boolean, data: Array, error?: string }}
+ */
+export const getAllLeads = async (filters = {}) => {
     try {
         let query = supabase
             .from('leads')
-            .select('*')
-            .or('is_hidden.is.null,is_hidden.eq.false')
-            .order('created_at', { ascending: false });
+            .select('*');
 
         // Apply filters
         if (filters.status && filters.status !== 'all') {
@@ -148,6 +175,10 @@ export const fetchLeads = async (filters = {}) => {
         if (filters.propertyType) {
             query = query.eq('property_type', filters.propertyType);
         }
+        // Support both userId and tenantId as filter parameters
+        if (filters.userId || filters.tenantId) {
+            query = query.eq('user_id', filters.userId || filters.tenantId);
+        }
         if (filters.minBudget) {
             query = query.gte('budget', filters.minBudget);
         }
@@ -155,14 +186,29 @@ export const fetchLeads = async (filters = {}) => {
             query = query.lte('budget', filters.maxBudget);
         }
 
-        const { data, error, count } = await query;
+        // By default exclude hidden leads (for agents); admin can pass includeHidden: true
+        if (!filters.includeHidden) {
+            query = query.or('is_hidden.is.null,is_hidden.eq.false');
+        }
+
+        // Order
+        query = query.order('created_at', { ascending: false });
+
+        // Pagination
+        if (filters.limit) {
+            query = query.limit(filters.limit);
+        }
+        if (filters.offset) {
+            query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
-
-        return { success: true, leads: data || [], count: count || data?.length || 0 };
+        return { success: true, data: data || [] };
     } catch (error) {
-        console.error('Error fetching leads:', error);
-        return { success: false, leads: [], count: 0, error: error.message };
+        console.error('Error getting leads:', error);
+        return { success: false, data: [], error: error.message };
     }
 };
 
@@ -702,19 +748,145 @@ export const getTenantLeads = async (tenantEmail, options = {}) => {
 };
 
 /**
- * Update a lead's status
+ * Update any lead fields (general purpose)
+ * Matches web: updateLead() in database.js
+ *
+ * @param {string} leadId - UUID of the lead
+ * @param {Object} updates - key/value pairs to update (e.g. { status, budget, location })
+ * @returns {{ success: boolean, error?: string, code?: string }}
  */
-export const updateLeadStatus = async (leadId, status) => {
+export const updateLead = async (leadId, updates) => {
     try {
         const { error } = await supabase
             .from('leads')
-            .update({ status, updated_at: new Date().toISOString() })
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString(),
+            })
             .eq('id', leadId);
 
         if (error) throw error;
         return { success: true };
     } catch (error) {
-        console.error('Error updating lead status:', error);
+        console.error('Error updating lead:', error);
+        return { success: false, error: error.message, code: error.code };
+    }
+};
+
+/**
+ * Update a lead's status (convenience wrapper)
+ */
+export const updateLeadStatus = async (leadId, status) => {
+    return updateLead(leadId, { status });
+};
+
+/**
+ * Increment unique agent contact count on a lead
+ * Matches web: incrementLeadContacts() in database.js
+ *
+ * @param {string} leadId
+ * @returns {{ success: boolean, error?: string }}
+ */
+export const incrementLeadContacts = async (leadId) => {
+    try {
+        // Read current contacts count
+        const { data: lead } = await supabase
+            .from('leads')
+            .select('contacts')
+            .eq('id', leadId)
+            .single();
+
+        const newContacts = (lead?.contacts || 0) + 1;
+
+        const { error } = await supabase
+            .from('leads')
+            .update({ contacts: newContacts, updated_at: new Date().toISOString() })
+            .eq('id', leadId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error('Error incrementing lead contacts:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Check if an agent has EVER contacted a specific lead (any contact_type).
+ * Used by trackAgentLeadContact to decide whether to bump unique-agent counter.
+ *
+ * @param {string} agentId
+ * @param {string} leadId
+ * @returns {Promise<boolean>}
+ */
+export const hasAgentContactedLead = async (agentId, leadId) => {
+    try {
+        const { data, error } = await supabase
+            .from('contact_history')
+            .select('id')
+            .eq('agent_id', agentId)
+            .eq('lead_id', leadId)
+            .limit(1);
+
+        if (error) return false;
+        return data && data.length > 0;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Log an agent-lead contact event (phone, email, whatsapp, view, etc.)
+ * Deducts the per-type credit cost and increments unique agent count on first contact.
+ * Matches web: trackAgentLeadContact() in database.js
+ *
+ * Contact costs: phone=3, email=2, whatsapp=2, view=1, browse=0
+ *
+ * @param {string} agentId
+ * @param {string} leadId
+ * @param {'phone'|'email'|'whatsapp'|'view'|'browse'} contactType
+ * @returns {{ success: boolean, error?: string }}
+ */
+export const trackAgentLeadContact = async (agentId, leadId, contactType) => {
+    try {
+        // Per-type credit costs (matching web)
+        const contactCosts = {
+            phone: 3,
+            email: 2,
+            whatsapp: 2,
+            view: 1,
+            browse: 0,
+        };
+        const cost = contactCosts[contactType] ?? 0;
+
+        // Check if this is the first-ever contact by this agent on this lead
+        const isFirstContact = !(await hasAgentContactedLead(agentId, leadId));
+
+        // Deduct credits if cost > 0
+        if (cost > 0) {
+            const deductResult = await deductCredits(agentId, cost, `Lead Contact - ${contactType}`);
+            if (!deductResult.success) {
+                return deductResult; // Insufficient balance or error
+            }
+        }
+
+        // Log into contact_history
+        await supabase.from('contact_history').insert({
+            agent_id: agentId,
+            lead_id: leadId,
+            contact_type: contactType,
+            cost_credits: cost,
+            created_at: new Date().toISOString(),
+        });
+
+        // Only increment leads.contacts if this is a NEW unique agent
+        if (isFirstContact) {
+            await incrementLeadContacts(leadId);
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error tracking agent-lead contact:', error);
         return { success: false, error: error.message };
     }
 };

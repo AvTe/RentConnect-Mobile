@@ -25,6 +25,7 @@ import {
     calculateExclusiveCost,
     getRemainingTime,
     unlockLead,
+    subscribeToLeads,
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
 import { getWalletBalance } from '../../lib/database';
@@ -107,6 +108,29 @@ const AgentLeadsScreen = ({ navigation }) => {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Real-time lead subscription — matches web's subscribeToLeads
+    useEffect(() => {
+        const unsubscribe = subscribeToLeads({}, (payload) => {
+            // Refresh leads list on any INSERT, UPDATE, or DELETE
+            if (payload.eventType === 'INSERT') {
+                // New lead added — refresh to show it
+                loadData();
+            } else if (payload.eventType === 'UPDATE') {
+                // Lead updated (slots, status, etc.) — update in place
+                setLeads(prev => prev.map(lead =>
+                    lead.id === payload.new.id ? { ...lead, ...payload.new } : lead
+                ));
+            } else if (payload.eventType === 'DELETE') {
+                // Lead removed
+                setLeads(prev => prev.filter(lead => lead.id !== payload.old.id));
+            }
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
 
     const onRefresh = () => {
         setRefreshing(true);

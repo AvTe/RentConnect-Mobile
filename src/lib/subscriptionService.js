@@ -180,3 +180,33 @@ export const cancelSubscription = async (subscriptionId) => {
         return { success: false, error: error.message };
     }
 };
+
+/**
+ * Update a subscription (general-purpose update)
+ * Matches web: updateSubscription in lib/database.js
+ * @param {string} subscriptionId - Subscription UUID
+ * @param {object} updates - Fields to update (plan_name, status, amount, expires_at, etc.)
+ */
+export const updateSubscription = async (subscriptionId, updates) => {
+    try {
+        if (!subscriptionId) {
+            return { success: false, error: 'Subscription ID is required' };
+        }
+
+        const { data, error } = await supabase
+            .from('subscriptions')
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', subscriptionId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error updating subscription:', error);
+        return { success: false, error: error.message };
+    }
+};

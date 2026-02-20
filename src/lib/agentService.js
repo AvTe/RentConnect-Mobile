@@ -180,3 +180,91 @@ export const AGENT_SPECIALIZATIONS = [
     'Luxury',
     'Student Housing',
 ];
+
+// ============================================
+// AGENT STORAGE USAGE
+// Matches web: getAgentStorageUsage() in lib/assets.js
+// Table: agent_storage_usage
+// ============================================
+
+const MAX_STORAGE_BYTES = 52428800; // 50 MB — same as web
+
+/**
+ * Get or create storage usage record for an agent.
+ * Matches web: getAgentStorageUsage() in lib/assets.js
+ *
+ * @param {string} agentId
+ * @returns {Promise<{ success: boolean, data?: object, error?: string }>}
+ */
+export const getAgentStorageUsage = async (agentId) => {
+    try {
+        // Get or create storage usage record
+        let { data, error } = await supabase
+            .from('agent_storage_usage')
+            .select('*')
+            .eq('agent_id', agentId)
+            .single();
+
+        if (error && error.code === 'PGRST116') {
+            // Record doesn't exist, create it
+            const { data: newData, error: insertError } = await supabase
+                .from('agent_storage_usage')
+                .insert({
+                    agent_id: agentId,
+                    total_storage_bytes: 0,
+                    storage_limit_bytes: MAX_STORAGE_BYTES,
+                    image_count: 0,
+                    video_count: 0,
+                    document_count: 0
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+            data = newData;
+        } else if (error) {
+            throw error;
+        }
+
+        return {
+            success: true,
+            data: {
+                totalUsed: data.total_storage_bytes,
+                limit: data.storage_limit_bytes,
+                remaining: data.storage_limit_bytes - data.total_storage_bytes,
+                percentage: Math.round((data.total_storage_bytes / data.storage_limit_bytes) * 100),
+                imageCount: data.image_count,
+                videoCount: data.video_count,
+                documentCount: data.document_count,
+            }
+        };
+    } catch (error) {
+        console.error('Error getting storage usage:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Update the storage usage record after upload/delete.
+ *
+ * @param {string} agentId
+ * @param {object} updates - { total_storage_bytes, image_count, video_count, document_count }
+ * @returns {Promise<{ success: boolean, error?: string }>}
+ */
+export const updateAgentStorageUsage = async (agentId, updates) => {
+    try {
+        const { error } = await supabase
+            .from('agent_storage_usage')
+            .upsert({
+                agent_id: agentId,
+                ...updates,
+                storage_limit_bytes: MAX_STORAGE_BYTES,
+            }, { onConflict: 'agent_id' });
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating storage usage:', error);
+        return { success: false, error: error.message };
+    }
+};

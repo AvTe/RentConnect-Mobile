@@ -200,6 +200,133 @@ export const getAgentsPendingRating = async (tenantId) => {
     }
 };
 
+/**
+ * Update an agent rating (only the rating owner can update)
+ * Matches web: updateAgentRating in database.js
+ * @param {string} ratingId - Rating UUID
+ * @param {string} tenantId - Tenant UUID (for ownership check)
+ * @param {object} updates - Fields to update (rating, reviewText, category ratings)
+ */
+export const updateAgentRating = async (ratingId, tenantId, updates) => {
+    try {
+        if (!ratingId || !tenantId) {
+            return { success: false, error: 'Rating ID and tenant ID are required' };
+        }
+
+        const updateData = {};
+
+        if (updates.rating !== undefined) {
+            if (updates.rating < 1 || updates.rating > 5) {
+                return { success: false, error: 'Rating must be between 1 and 5' };
+            }
+            updateData.rating = updates.rating;
+        }
+        if (updates.reviewText !== undefined) updateData.review_text = updates.reviewText;
+        if (updates.review !== undefined) updateData.review = updates.review;
+        if (updates.responsivenessRating !== undefined) updateData.responsiveness_rating = updates.responsivenessRating;
+        if (updates.professionalismRating !== undefined) updateData.professionalism_rating = updates.professionalismRating;
+        if (updates.helpfulnessRating !== undefined) updateData.helpfulness_rating = updates.helpfulnessRating;
+        if (updates.categories !== undefined) updateData.categories = updates.categories;
+
+        updateData.updated_at = new Date().toISOString();
+
+        const { data, error } = await supabase
+            .from('agent_ratings')
+            .update(updateData)
+            .eq('id', ratingId)
+            .eq('tenant_id', tenantId) // Ensure only the owner can update
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        if (!data) {
+            return { success: false, error: 'Rating not found or you do not have permission to update it' };
+        }
+
+        return { success: true, data };
+    } catch (error) {
+        console.error('Error updating agent rating:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Delete (soft-delete) an agent rating
+ * Matches web: deleteAgentRating in database.js
+ * Sets status to 'removed' rather than hard deleting
+ * @param {string} ratingId - Rating UUID
+ * @param {string} userId - User UUID (tenant or admin)
+ */
+export const deleteAgentRating = async (ratingId, userId) => {
+    try {
+        if (!ratingId || !userId) {
+            return { success: false, error: 'Rating ID and user ID are required' };
+        }
+
+        // Check if user is admin or the tenant who created the rating
+        const { data: user } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', userId)
+            .single();
+
+        const isAdmin = ['admin', 'super_admin', 'main_admin'].includes(user?.role);
+
+        let query = supabase
+            .from('agent_ratings')
+            .update({ status: 'removed', updated_at: new Date().toISOString() })
+            .eq('id', ratingId);
+
+        // If not admin, only allow owner to delete
+        if (!isAdmin) {
+            query = query.eq('tenant_id', userId);
+        }
+
+        const { data, error } = await query.select().single();
+
+        if (error) throw error;
+
+        if (!data) {
+            return { success: false, error: 'Rating not found or you do not have permission to delete it' };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting agent rating:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Flag an agent rating as inappropriate
+ * Matches web: flagAgentRating in database.js
+ * @param {string} ratingId - Rating UUID
+ * @param {string} reason - Reason for flagging
+ */
+export const flagAgentRating = async (ratingId, reason) => {
+    try {
+        if (!ratingId) {
+            return { success: false, error: 'Rating ID is required' };
+        }
+
+        const { error } = await supabase
+            .from('agent_ratings')
+            .update({
+                status: 'flagged',
+                flag_reason: reason || null,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', ratingId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error('Error flagging rating:', error);
+        return { success: false, error: error.message };
+    }
+};
+
 // Rating categories matching web
 export const RATING_CATEGORIES = [
     { id: 'communication', label: 'Communication', icon: 'message-circle' },
