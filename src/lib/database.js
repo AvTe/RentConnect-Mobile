@@ -109,9 +109,12 @@ export const createUser = async (userId, userData) => {
         // Determine role/type
         const userType = userData.type || userData.user_type || 'tenant';
 
+        // Use upsert to handle cases where the email already exists
+        // (e.g. user previously signed up as tenant, or a prior failed attempt
+        //  left a partial row). onConflict on 'id' merges gracefully.
         const { error } = await supabase
             .from('users')
-            .insert({
+            .upsert({
                 id: userId,
                 email: userData.email,
                 name: nameStr,
@@ -123,9 +126,33 @@ export const createUser = async (userId, userData) => {
                 verification_status: 'pending',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'id',
+                ignoreDuplicates: false,
             });
 
-        if (error) throw error;
+        if (error) {
+            // If upsert on 'id' still hits the email unique constraint,
+            // the email belongs to a different user row — update that row instead
+            if (error.code === '23505' && error.message?.includes('users_email_key')) {
+                logger.log('[CreateUser] Email already exists, updating existing row for:', userData.email);
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({
+                        id: userId,
+                        name: nameStr,
+                        phone: userData.phone || null,
+                        role: userType,
+                        type: userType,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('email', userData.email);
+
+                if (updateError) throw updateError;
+            } else {
+                throw error;
+            }
+        }
 
         logger.log('[CreateUser] User created successfully:', userId);
 

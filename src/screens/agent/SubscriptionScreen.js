@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     RefreshControl,
     ActivityIndicator,
+    Linking,
+    Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -82,6 +84,50 @@ const SubscriptionScreen = ({ navigation }) => {
 
     const formatPrice = (price) => `KES ${Number(price).toLocaleString()}`;
 
+    const handleSubscribe = (plan) => {
+        Alert.alert(
+            currentSubscription ? 'Upgrade Plan' : 'Subscribe',
+            `${plan.name} — ${formatPrice(plan.price)}/${plan.duration_days ? `${plan.duration_days} days` : 'month'}\n\nYou will be redirected to complete payment on our secure web portal.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Continue to Payment',
+                    onPress: () => {
+                        const params = new URLSearchParams({
+                            plan_id: plan.id,
+                            user_id: user?.id || '',
+                            source: 'mobile',
+                        });
+                        Linking.openURL(`https://yoombaa.com/pricing?${params.toString()}`)
+                            .catch(() => toast.error('Could not open payment page'));
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleBuyBundle = (bundle) => {
+        Alert.alert(
+            'Buy Credits',
+            `${bundle.name || bundle.credits + ' Credits'} — ${formatPrice(bundle.price)}${bundle.bonus_credits > 0 ? ` (+${bundle.bonus_credits} bonus)` : ''}\n\nYou will be redirected to complete payment.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Continue to Payment',
+                    onPress: () => {
+                        const params = new URLSearchParams({
+                            bundle_id: bundle.id,
+                            user_id: user?.id || '',
+                            source: 'mobile',
+                        });
+                        Linking.openURL(`https://yoombaa.com/pricing?${params.toString()}`)
+                            .catch(() => toast.error('Could not open payment page'));
+                    },
+                },
+            ]
+        );
+    };
+
     const renderCurrentPlan = () => {
         if (!currentSubscription) return null;
 
@@ -151,7 +197,7 @@ const SubscriptionScreen = ({ navigation }) => {
 
                 <TouchableOpacity
                     style={[styles.selectBtn, isPopular && styles.selectBtnPopular]}
-                    onPress={() => toast.info('Payment integration coming soon')}
+                    onPress={() => handleSubscribe(plan)}
                 >
                     <Text style={[styles.selectBtnText, isPopular && styles.selectBtnTextPopular]}>
                         {currentSubscription ? 'Upgrade' : 'Subscribe'}
@@ -165,7 +211,7 @@ const SubscriptionScreen = ({ navigation }) => {
         <TouchableOpacity
             key={bundle.id}
             style={styles.bundleCard}
-            onPress={() => navigation.navigate('BuyCredits', { bundleId: bundle.id })}
+            onPress={() => handleBuyBundle(bundle)}
             activeOpacity={0.7}
         >
             <View style={styles.bundleIconWrap}>

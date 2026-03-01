@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage, availableLanguages } from '../../context/LanguageContext';
+import { updateUser } from '../../lib/database';
 
 const AgentSettingsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -23,6 +24,28 @@ const AgentSettingsScreen = ({ navigation }) => {
     const { language, t } = useLanguage();
     const [pushNotifications, setPushNotifications] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(false);
+
+    // Load persisted notification preferences from user profile
+    useEffect(() => {
+        if (userData) {
+            setPushNotifications(userData.push_notifications !== false); // default true
+            setEmailAlerts(userData.email_alerts === true); // default false
+        }
+    }, [userData]);
+
+    const handleTogglePush = useCallback(async (value) => {
+        setPushNotifications(value);
+        if (user?.id) {
+            await updateUser(user.id, { push_notifications: value }).catch(() => {});
+        }
+    }, [user?.id]);
+
+    const handleToggleEmail = useCallback(async (value) => {
+        setEmailAlerts(value);
+        if (user?.id) {
+            await updateUser(user.id, { email_alerts: value }).catch(() => {});
+        }
+    }, [user?.id]);
 
     const handleSignOut = () => {
         Alert.alert(
@@ -156,7 +179,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         rightElement={
                             <Switch
                                 value={pushNotifications}
-                                onValueChange={setPushNotifications}
+                                onValueChange={handleTogglePush}
                                 trackColor={{ false: '#E5E7EB', true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
@@ -172,7 +195,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         rightElement={
                             <Switch
                                 value={emailAlerts}
-                                onValueChange={setEmailAlerts}
+                                onValueChange={handleToggleEmail}
                                 trackColor={{ false: '#E5E7EB', true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />

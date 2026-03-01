@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import { createUser, getUser, updateUser } from '../lib/database';
 import { logger } from '../lib/logger';
@@ -12,6 +13,7 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
 
   useEffect(() => {
     // Get initial session
@@ -32,10 +34,16 @@ export const AuthProvider = ({ children }) => {
         setSession(session);
         setUser(session?.user ?? null);
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (event === 'PASSWORD_RECOVERY') {
+          // User clicked password reset link - set recovery mode
+          logger.log('Password recovery mode activated');
+          setPasswordRecoveryMode(true);
+          setLoading(false);
+        } else if (event === 'SIGNED_IN' && session?.user) {
           await fetchUserData(session.user.id);
         } else if (event === 'SIGNED_OUT') {
           setUserData(null);
+          setPasswordRecoveryMode(false);
           setLoading(false);
         } else if (session?.user) {
           await fetchUserData(session.user.id);
@@ -75,8 +83,24 @@ export const AuthProvider = ({ children }) => {
    */
   const signIn = async (email, password) => {
     try {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check if the email exists in our users table first
+      const { data: existingUser, error: lookupError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (!existingUser && !lookupError) {
+        return {
+          success: false,
+          error: 'No account found with this email. Please sign up to create a new Yoombaa account.',
+        };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         password,
       });
 
@@ -91,7 +115,23 @@ export const AuthProvider = ({ children }) => {
           errorMessage = 'Please verify your email address before signing in. Check your inbox (and spam folder) for the confirmation link.';
         } else if (error.message.includes('Invalid login credentials') ||
           error.message.includes('invalid_credentials')) {
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+          // Supabase v2 returns "Invalid login credentials" for BOTH wrong password
+          // and unconfirmed email. Try resending confirmation to differentiate.
+          try {
+            const { error: resendError } = await supabase.auth.resend({
+              type: 'signup',
+              email: normalizedEmail,
+            });
+            if (!resendError) {
+              // Resend succeeded → email exists but is NOT confirmed
+              errorMessage = 'Your email is not verified yet. We\'ve sent a new verification link to your inbox. Please verify your email and try again.';
+            } else {
+              // Resend failed → email is confirmed, so it's a wrong password
+              errorMessage = 'Incorrect password. Please try again or use "Forgot Password" to reset it.';
+            }
+          } catch {
+            errorMessage = 'Incorrect password. Please try again or use "Forgot Password" to reset it.';
+          }
         } else if (error.message.includes('Too many requests')) {
           errorMessage = 'Too many login attempts. Please try again in a few minutes.';
         }
@@ -136,6 +176,15 @@ export const AuthProvider = ({ children }) => {
         }
 
         return { success: false, error: errorMessage };
+      }
+
+      // Supabase returns a user with empty identities when email is already
+      // registered but unconfirmed — treat this as "already registered"
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        return {
+          success: false,
+          error: 'This email is already registered. Please check your inbox for the confirmation link, or sign in if you already verified.',
+        };
       }
 
       // If user was created successfully, create user record in database
@@ -187,14 +236,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Send password reset email
+   * Send password reset email (sends a 6-digit OTP code)
+   * NOTE: You must update the Supabase email template for "Reset Password" to include {{ .Token }}
+   * so the email shows the 6-digit code prominently to the user.
    */
   const resetPassword = async (email) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.toLowerCase().trim(),
-        { redirectTo: 'yoombaa://reset-password' }
-      );
+      const normalizedEmail = email.toLowerCase().trim();
+      logger.log('Sending password reset OTP to:', normalizedEmail);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
 
       if (error) {
         console.error('Password reset error:', error);
@@ -211,12 +262,145 @@ export const AuthProvider = ({ children }) => {
 
       return {
         success: true,
-        message: 'If an account exists with this email, you will receive a password reset link.'
+        message: 'If an account exists with this email, you will receive a 6-digit code.'
       };
     } catch (error) {
       console.error('Error sending reset email:', error);
       return { success: false, error: 'Failed to send reset email. Please try again.' };
     }
+  };
+
+  /**
+   * Verify the 6-digit OTP code from the password reset email
+   * This does NOT require opening any supabase.co URL — works entirely via API
+   */
+  const verifyResetOtp = async (email, otpCode) => {
+    try {
+      const normalizedEmail = email.toLowerCase().trim();
+      logger.log('Verifying password reset OTP for:', normalizedEmail);
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: normalizedEmail,
+        token: otpCode,
+        type: 'recovery',
+      });
+
+      if (error) {
+        console.error('OTP verification error:', error);
+
+        if (error.message.includes('expired') || error.message.includes('Token has expired')) {
+          return { success: false, error: 'This code has expired. Please request a new one.' };
+        }
+        if (error.message.includes('invalid') || error.message.includes('Invalid')) {
+          return { success: false, error: 'Invalid code. Please check and try again.' };
+        }
+
+        return { success: false, error: error.message || 'Verification failed. Please try again.' };
+      }
+
+      // PASSWORD_RECOVERY event will fire from onAuthStateChange → sets passwordRecoveryMode
+      logger.log('OTP verified successfully, recovery session set');
+      return { success: true };
+    } catch (error) {
+      console.error('Error verifying reset OTP:', error);
+      return { success: false, error: 'Verification failed. Please try again.' };
+    }
+  };
+
+  /**
+   * Clear password recovery mode flag
+   */
+  const clearPasswordRecoveryMode = () => {
+    setPasswordRecoveryMode(false);
+  };
+
+  /**
+   * Handle incoming deep link URL for auth (password recovery tokens)
+   * Supports multiple URL formats from Supabase:
+   * - Hash fragment: yoombaa://reset-password#access_token=xxx&refresh_token=xxx&type=recovery
+   * - PKCE code: yoombaa://reset-password?code=xxx
+   * - Token hash: ...?token_hash=xxx&type=recovery
+   */
+  const handleAuthDeepLink = async (url) => {
+    if (!url) return false;
+
+    try {
+      logger.log('Handling auth deep link:', url);
+
+      // Check for PKCE code in query parameters
+      const questionIndex = url.indexOf('?');
+      if (questionIndex !== -1) {
+        const queryString = url.substring(questionIndex + 1).split('#')[0]; // get query before hash
+        const queryParams = new URLSearchParams(queryString);
+        
+        // Handle PKCE code flow
+        const code = queryParams.get('code');
+        if (code) {
+          logger.log('PKCE code found, exchanging for session...');
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('Error exchanging code for session:', error);
+            return false;
+          }
+          // PASSWORD_RECOVERY event will be fired by onAuthStateChange
+          return true;
+        }
+
+        // Handle token_hash flow
+        const tokenHash = queryParams.get('token_hash');
+        const type = queryParams.get('type');
+        if (tokenHash && type === 'recovery') {
+          logger.log('Token hash found, verifying OTP...');
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          });
+          if (error) {
+            console.error('Error verifying recovery token:', error);
+            return false;
+          }
+          return true;
+        }
+      }
+
+      // Check for hash fragment tokens (implicit flow)
+      const hashIndex = url.indexOf('#');
+      if (hashIndex !== -1) {
+        const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+
+        if (type === 'recovery' && accessToken && refreshToken) {
+          logger.log('Recovery tokens found, setting session...');
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error('Error setting recovery session:', error);
+            return false;
+          }
+
+          // PASSWORD_RECOVERY event will be fired by onAuthStateChange
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error handling auth deep link:', error);
+      return false;
+    }
+  };
+
+  /**
+   * Verify a password recovery link pasted by the user (legacy fallback)
+   * Now redirects to OTP-based flow
+   */
+  const verifyRecoveryLink = async (link) => {
+    return { success: false, error: 'Please use the 6-digit code from your email instead.' };
   };
 
   /**
@@ -263,11 +447,16 @@ export const AuthProvider = ({ children }) => {
     userData,
     userProfile: userData, // Alias for compatibility
     loading,
+    passwordRecoveryMode,
     // Auth methods
     signIn,
     signUp,
     signOut,
     resetPassword,
+    handleAuthDeepLink,
+    clearPasswordRecoveryMode,
+    verifyRecoveryLink,
+    verifyResetOtp,
     // Profile methods
     updateProfile,
     refreshUserData,

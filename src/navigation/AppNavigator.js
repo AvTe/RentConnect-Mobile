@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import LandingScreen from '../screens/LandingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import TenantLeadScreen from '../screens/TenantLeadScreen';
 import SplashScreen from '../screens/SplashScreen';
 
@@ -299,6 +300,7 @@ const AuthStack = () => {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen
         name="TenantLead"
         component={TenantLeadScreen}
@@ -411,6 +413,11 @@ const TenantMainStack = () => {
         name="SavedProperties"
         component={SavedPropertiesScreen}
         options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>
   );
@@ -561,6 +568,11 @@ const AgentMainStack = () => {
         component={AgentBrowseScreen}
         options={{ animation: 'slide_from_right' }}
       />
+      <Stack.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
     </Stack.Navigator>
   );
 };
@@ -572,9 +584,10 @@ const linking = {
   prefixes: [prefix, 'yoombaa://', 'https://yoombaa.com', 'https://www.yoombaa.com'],
   config: {
     screens: {
-      // Auth screens (no deep links needed)
+      // Auth screens
       Landing: 'landing',
       Login: 'login',
+      ResetPassword: 'reset-password',
       // Agent stack screens
       AgentTabs: {
         screens: {
@@ -598,8 +611,44 @@ const linking = {
 };
 
 const AppNavigator = () => {
-  const { user, loading, isAgent, isTenant } = useAuth();
+  const { user, loading, isAgent, isTenant, passwordRecoveryMode, handleAuthDeepLink, clearPasswordRecoveryMode } = useAuth();
   const { isDark, colors } = useTheme();
+  const navigationRef = useNavigationContainerRef();
+
+  // Handle incoming deep links for password recovery tokens
+  React.useEffect(() => {
+    // Check the initial URL when app opens from a deep link
+    const handleInitialUrl = async () => {
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) {
+        await handleAuthDeepLink(initialUrl);
+      }
+    };
+    handleInitialUrl();
+
+    // Listen for deep links while the app is open
+    const subscription = Linking.addEventListener('url', async (event) => {
+      if (event.url) {
+        await handleAuthDeepLink(event.url);
+      }
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
+  // Navigate to ResetPassword screen when recovery mode is activated
+  React.useEffect(() => {
+    if (passwordRecoveryMode && navigationRef.isReady()) {
+      // Small delay to ensure navigation is fully ready after stack render
+      setTimeout(() => {
+        try {
+          navigationRef.navigate('ResetPassword');
+        } catch (e) {
+          console.warn('Could not navigate to ResetPassword:', e);
+        }
+      }, 300);
+    }
+  }, [passwordRecoveryMode]);
 
   if (loading) {
     return <SplashScreen />;
@@ -607,6 +656,11 @@ const AppNavigator = () => {
 
   // Determine which stack to show
   const renderMainStack = () => {
+    // CRITICAL: During password recovery, keep the AuthStack active
+    // so ResetPassword screen stays mounted. Without this, setting
+    // the recovery session would switch to Agent/Tenant stack and
+    // unmount the ResetPassword screen.
+    if (passwordRecoveryMode) return <AuthStack />;
     if (!user) return <AuthStack />;
 
     // Check user type
@@ -650,7 +704,7 @@ const AppNavigator = () => {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme} linking={linking}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme} linking={linking}>
       {renderMainStack()}
     </NavigationContainer>
   );

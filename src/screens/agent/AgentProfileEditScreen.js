@@ -9,13 +9,16 @@ import {
     ActivityIndicator,
     Alert,
     Image,
+    Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { updateUser } from '../../lib/database';
+import { sendOTP, verifyOTP } from '../../lib/api';
 
 const COLORS = {
     primary: '#FE9200',
@@ -38,6 +41,18 @@ const AgentProfileEditScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [profileImage, setProfileImage] = useState(null);
+
+    // Phone OTP verification state
+    const [otpModalVisible, setOtpModalVisible] = useState(false);
+    const [otpCode, setOtpCode] = useState('');
+    const [otpSending, setOtpSending] = useState(false);
+    const [otpVerifying, setOtpVerifying] = useState(false);
+    const [phoneVerified, setPhoneVerified] = useState(false);
+
+    // KYC/identity verification state
+    const [verificationStatus, setVerificationStatus] = useState('unverified'); // unverified | pending | verified | rejected
+    const [idDocument, setIdDocument] = useState(null); // { name, uri }
+    const [uploadingDoc, setUploadingDoc] = useState(false);
 
     // Form fields
     const [formData, setFormData] = useState({
@@ -62,11 +77,65 @@ const AgentProfileEditScreen = ({ navigation }) => {
                 specialization: userData.specialization || '',
             });
             setProfileImage(userData.avatar_url || userData.profile_image);
+            setPhoneVerified(userData.phone_verified || false);
+            setVerificationStatus(userData.verification_status || 'unverified');
+            if (userData.id_document_url) {
+                setIdDocument({ name: 'ID Document (uploaded)', uri: userData.id_document_url });
+            }
         }
     }, [userData, user]);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        if (field === 'phone') setPhoneVerified(false);
+    };
+
+    // Phone OTP verification
+    const handleSendOTP = async () => {
+        const phone = formData.phone.trim();
+        if (!phone) {
+            toast.error('Please enter a phone number first');
+            return;
+        }
+        setOtpSending(true);
+        try {
+            const result = await sendOTP(phone);
+            if (result.success) {
+                setOtpCode('');
+                setOtpModalVisible(true);
+                toast.success('OTP sent to ' + phone);
+            } else {
+                toast.error(result.error || 'Failed to send OTP');
+            }
+        } catch {
+            toast.error('Could not send OTP. Try again later.');
+        } finally {
+            setOtpSending(false);
+        }
+    };
+
+    const handleVerifyOTP = async () => {
+        if (otpCode.length < 4) {
+            toast.error('Please enter the verification code');
+            return;
+        }
+        setOtpVerifying(true);
+        try {
+            const result = await verifyOTP(formData.phone.trim(), otpCode);
+            if (result.success) {
+                setPhoneVerified(true);
+                setOtpModalVisible(false);
+                toast.success('Phone verified successfully!');
+                // Persist verification flag
+                await updateUser(user.id, { phone_verified: true }).catch(() => {});
+            } else {
+                toast.error(result.error || 'Invalid code. Try again.');
+            }
+        } catch {
+            toast.error('Verification failed. Try again.');
+        } finally {
+            setOtpVerifying(false);
+        }
     };
 
     const handlePickImage = async () => {
@@ -230,6 +299,30 @@ const AgentProfileEditScreen = ({ navigation }) => {
                         placeholder="+254 700 000 000"
                         keyboardType="phone-pad"
                     />
+                    {/* Phone Verification */}
+                    <View style={styles.phoneVerifyRow}>
+                        {phoneVerified ? (
+                            <View style={styles.verifiedBadge}>
+                                <Feather name="check-circle" size={14} color={COLORS.success} />
+                                <Text style={styles.verifiedText}>Verified</Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.verifyBtn}
+                                onPress={handleSendOTP}
+                                disabled={otpSending || !formData.phone.trim()}
+                            >
+                                {otpSending ? (
+                                    <ActivityIndicator size="small" color={COLORS.primary} />
+                                ) : (
+                                    <>
+                                        <Feather name="shield" size={14} color={COLORS.primary} />
+                                        <Text style={styles.verifyBtnText}>Verify Phone</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
 
                 {/* Agency Information */}
@@ -270,6 +363,122 @@ const AgentProfileEditScreen = ({ navigation }) => {
                         placeholder="Tell tenants about yourself and your services..."
                         multiline
                     />
+                </View>
+
+                {/* Identity Verification (KYC) Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Identity Verification</Text>
+
+                    {/* Verification Status Banner */}
+                    <View style={[
+                        styles.kycStatusBanner,
+                        verificationStatus === 'verified' && styles.kycStatusVerified,
+                        verificationStatus === 'pending' && styles.kycStatusPending,
+                        verificationStatus === 'rejected' && styles.kycStatusRejected,
+                    ]}>
+                        <Feather
+                            name={verificationStatus === 'verified' ? 'check-circle' : verificationStatus === 'pending' ? 'clock' : verificationStatus === 'rejected' ? 'x-circle' : 'shield'}
+                            size={20}
+                            color={verificationStatus === 'verified' ? COLORS.success : verificationStatus === 'pending' ? '#F59E0B' : verificationStatus === 'rejected' ? COLORS.error : COLORS.textSecondary}
+                        />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.kycStatusTitle}>
+                                {verificationStatus === 'verified' ? 'Verified Agent' :
+                                 verificationStatus === 'pending' ? 'Verification Pending' :
+                                 verificationStatus === 'rejected' ? 'Verification Rejected' :
+                                 'Not Verified'}
+                            </Text>
+                            <Text style={styles.kycStatusDesc}>
+                                {verificationStatus === 'verified' ? 'Your identity has been verified. Tenants can see your verified badge.' :
+                                 verificationStatus === 'pending' ? 'Your document is being reviewed. This usually takes 1-2 business days.' :
+                                 verificationStatus === 'rejected' ? 'Please re-upload a valid government-issued ID.' :
+                                 'Upload a government-issued ID to get a verified badge and build trust with tenants.'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Document Upload */}
+                    {verificationStatus !== 'verified' && (
+                        <>
+                            {idDocument ? (
+                                <View style={styles.docCard}>
+                                    <Feather name="file-text" size={22} color={COLORS.primary} />
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={styles.docName} numberOfLines={1}>{idDocument.name}</Text>
+                                        <Text style={styles.docHint}>Tap to replace</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setIdDocument(null)}>
+                                        <Feather name="x" size={18} color={COLORS.textSecondary} />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
+
+                            <TouchableOpacity
+                                style={styles.uploadBtn}
+                                onPress={async () => {
+                                    try {
+                                        const result = await DocumentPicker.getDocumentAsync({
+                                            type: ['image/*', 'application/pdf'],
+                                            copyToCacheDirectory: true,
+                                        });
+                                        if (!result.canceled && result.assets?.[0]) {
+                                            setIdDocument({
+                                                name: result.assets[0].name,
+                                                uri: result.assets[0].uri,
+                                            });
+                                            toast.success('Document selected');
+                                        }
+                                    } catch (err) {
+                                        toast.error('Failed to pick document');
+                                    }
+                                }}
+                            >
+                                <Feather name="upload" size={18} color={COLORS.primary} />
+                                <Text style={styles.uploadBtnText}>
+                                    {idDocument ? 'Replace Document' : 'Upload ID Document'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {idDocument && verificationStatus !== 'pending' && (
+                                <TouchableOpacity
+                                    style={[styles.submitKycBtn, uploadingDoc && { opacity: 0.6 }]}
+                                    onPress={async () => {
+                                        setUploadingDoc(true);
+                                        try {
+                                            // Save verification request to database
+                                            const result = await updateUser(user.id, {
+                                                verification_status: 'pending',
+                                                id_document_name: idDocument.name,
+                                                kyc_submitted_at: new Date().toISOString(),
+                                            });
+                                            if (result.success) {
+                                                setVerificationStatus('pending');
+                                                toast.success('Verification submitted! We\'ll review your document shortly.');
+                                                if (refreshUserData) await refreshUserData();
+                                            } else {
+                                                throw new Error(result.error);
+                                            }
+                                        } catch (err) {
+                                            toast.error('Failed to submit verification');
+                                        } finally {
+                                            setUploadingDoc(false);
+                                        }
+                                    }}
+                                    disabled={uploadingDoc}
+                                >
+                                    {uploadingDoc ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <Text style={styles.submitKycBtnText}>Submit for Verification</Text>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+
+                            <Text style={styles.kycHint}>
+                                Accepted: National ID, Passport, or Driver's License (image or PDF)
+                            </Text>
+                        </>
+                    )}
                 </View>
 
                 {/* Quick Links */}
@@ -327,6 +536,48 @@ const AgentProfileEditScreen = ({ navigation }) => {
 
                 <View style={{ height: 50 }} />
             </ScrollView>
+
+            {/* OTP Verification Modal */}
+            <Modal visible={otpModalVisible} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <TouchableOpacity style={styles.modalClose} onPress={() => setOtpModalVisible(false)}>
+                            <Feather name="x" size={20} color={COLORS.text} />
+                        </TouchableOpacity>
+                        <View style={styles.modalIconWrap}>
+                            <Feather name="smartphone" size={28} color={COLORS.primary} />
+                        </View>
+                        <Text style={styles.modalTitle}>Verify Phone</Text>
+                        <Text style={styles.modalSubtitle}>
+                            Enter the verification code sent to{' '}
+                            <Text style={{ fontFamily: 'DMSans_600SemiBold' }}>{formData.phone}</Text>
+                        </Text>
+                        <TextInput
+                            style={styles.otpInput}
+                            value={otpCode}
+                            onChangeText={setOtpCode}
+                            placeholder="Enter code"
+                            keyboardType="number-pad"
+                            maxLength={6}
+                            autoFocus
+                        />
+                        <TouchableOpacity
+                            style={[styles.modalBtn, otpVerifying && { opacity: 0.6 }]}
+                            onPress={handleVerifyOTP}
+                            disabled={otpVerifying}
+                        >
+                            {otpVerifying ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.modalBtnText}>Verify</Text>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.resendBtn} onPress={handleSendOTP} disabled={otpSending}>
+                            <Text style={styles.resendBtnText}>Resend Code</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -508,6 +759,212 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: COLORS.border,
         marginLeft: 66,
+    },
+    // Phone Verify
+    phoneVerifyRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: -8,
+        marginBottom: 12,
+    },
+    verifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: COLORS.successLight,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    verifiedText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.success,
+    },
+    verifyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: COLORS.primaryLight,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    verifyBtnText: {
+        fontSize: 12,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.primary,
+    },
+    // KYC / Identity Verification
+    kycStatusBanner: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        backgroundColor: COLORS.background,
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    kycStatusVerified: {
+        backgroundColor: '#D1FAE5',
+        borderColor: '#6EE7B7',
+    },
+    kycStatusPending: {
+        backgroundColor: '#FEF3C7',
+        borderColor: '#FCD34D',
+    },
+    kycStatusRejected: {
+        backgroundColor: '#FEE2E2',
+        borderColor: '#FCA5A5',
+    },
+    kycStatusTitle: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+        marginBottom: 2,
+    },
+    kycStatusDesc: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        lineHeight: 18,
+    },
+    docCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.primaryLight,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        borderStyle: 'dashed',
+    },
+    docName: {
+        fontSize: 14,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.text,
+    },
+    docHint: {
+        fontSize: 11,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 1,
+    },
+    uploadBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: COLORS.card,
+        borderWidth: 1.5,
+        borderColor: COLORS.primary,
+        borderStyle: 'dashed',
+        borderRadius: 14,
+        paddingVertical: 16,
+        marginBottom: 12,
+    },
+    uploadBtnText: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.primary,
+    },
+    submitKycBtn: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    submitKycBtnText: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: '#FFFFFF',
+    },
+    kycHint: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    // OTP Modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 30,
+    },
+    modalCard: {
+        width: '100%',
+        backgroundColor: COLORS.card,
+        borderRadius: 24,
+        padding: 28,
+        alignItems: 'center',
+    },
+    modalClose: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+    },
+    modalIconWrap: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: COLORS.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    otpInput: {
+        width: '100%',
+        height: 56,
+        backgroundColor: COLORS.background,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: COLORS.border,
+        textAlign: 'center',
+        fontSize: 24,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+        letterSpacing: 8,
+        marginBottom: 20,
+    },
+    modalBtn: {
+        width: '100%',
+        backgroundColor: COLORS.primary,
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalBtnText: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: '#FFFFFF',
+    },
+    resendBtn: { padding: 8 },
+    resendBtnText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.primary,
     },
 });
 

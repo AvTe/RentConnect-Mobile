@@ -18,7 +18,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import debounce from 'lodash.debounce';
 import { useToast } from '../context/ToastContext';
-import { createLead } from '../lib/leadService';
+import { useAuth } from '../context/AuthContext';
+import { createLead, updateLead } from '../lib/leadService';
 import {
     searchLocations,
     parseRequirementsWithAI,
@@ -33,9 +34,15 @@ import OTPInput from '../components/OTPInput';
 
 const TOTAL_STEPS = 4;
 
-const TenantLeadScreen = ({ navigation }) => {
+const TenantLeadScreen = ({ navigation, route }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
+    const { user, userData } = useAuth();
+
+    // Edit mode detection
+    const editLead = route?.params?.editLead || null;
+    const isEditMode = !!editLead;
+
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -98,6 +105,24 @@ const TenantLeadScreen = ({ navigation }) => {
         }
         return () => clearInterval(interval);
     }, [resendTimer]);
+
+    // Pre-fill form when editing
+    useEffect(() => {
+        if (isEditMode && editLead) {
+            setLocation(editLead.location || '');
+            setLocationData({ name: editLead.location });
+            setPropertyType(editLead.property_type || '');
+            if (editLead.budget) setBudget(editLead.budget.toString());
+            setName(editLead.tenant_name || userData?.name || '');
+            setEmail(editLead.tenant_email || userData?.email || user?.email || '');
+            setPhone(editLead.tenant_phone || '');
+        } else if (userData || user) {
+            // Pre-fill contact info for logged-in users creating new leads
+            if (!name && userData?.name) setName(userData.name);
+            if (!email && (userData?.email || user?.email)) setEmail(userData?.email || user?.email);
+            if (!phone && userData?.phone) setPhone(userData.phone);
+        }
+    }, [isEditMode, editLead]);
 
     // Debounced location search
     const debouncedSearch = useCallback(
@@ -277,6 +302,26 @@ const TenantLeadScreen = ({ navigation }) => {
             else if (propertyType === '3 Bedroom') bedrooms = 3;
             else if (propertyType === 'Studio') bedrooms = 0;
 
+            if (isEditMode) {
+                // Update existing lead
+                const updateData = {
+                    location: location.trim(),
+                    property_type: propertyType,
+                    bedrooms: bedrooms,
+                    budget: budgetValue,
+                    tenant_name: name.trim(),
+                    tenant_email: email.trim(),
+                    tenant_phone: phone.trim() || '',
+                };
+
+                const result = await updateLead(editLead.id, updateData);
+                if (!result.success) throw new Error(result.error || 'Failed to update lead');
+
+                toast.success('Request updated successfully!');
+                navigation.goBack();
+                return;
+            }
+
             // Prepare lead data (createLead service handles pricing, slots, and notifications)
             const leadData = {
                 location: location.trim(),
@@ -296,7 +341,7 @@ const TenantLeadScreen = ({ navigation }) => {
             setSubmitted(true);
         } catch (error) {
             console.error('Error submitting lead:', error);
-            toast.error('Failed to submit your request. Please try again.');
+            toast.error(isEditMode ? 'Failed to update your request.' : 'Failed to submit your request. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -367,21 +412,42 @@ const TenantLeadScreen = ({ navigation }) => {
                     </View>
 
                     {/* Buttons */}
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={() => navigation.navigate('Landing')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.primaryButtonText}>View My Requests</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.secondaryButton}
-                        onPress={() => navigation.navigate('Landing')}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.secondaryButtonText}>Go to Home</Text>
-                    </TouchableOpacity>
+                    {!user ? (
+                        <>
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={() => navigation.navigate('SignUp')}
+                                activeOpacity={0.8}
+                            >
+                                <Feather name="user-plus" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                <Text style={styles.primaryButtonText}>Create Account to Track Requests</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={() => navigation.navigate('Landing')}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.secondaryButtonText}>Go to Home</Text>
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={() => navigation.navigate('Landing')}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.primaryButtonText}>View My Requests</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={() => navigation.navigate('Landing')}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.secondaryButtonText}>Go to Home</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
                 </ScrollView>
             </View>
         );
@@ -727,7 +793,7 @@ const TenantLeadScreen = ({ navigation }) => {
                         ) : (
                             <>
                                 <Text style={styles.nextButtonText}>
-                                    {currentStep === 4 ? 'Submit Request' : 'Next Step'}
+                                    {currentStep === 4 ? (isEditMode ? 'Update Request' : 'Submit Request') : 'Next Step'}
                                 </Text>
                                 <Feather
                                     name={currentStep === 4 ? 'check' : 'chevron-right'}

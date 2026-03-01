@@ -68,6 +68,7 @@ const MyRequestsScreen = ({ navigation }) => {
     const handleManage = (request) => {
         const actions = [
             { text: 'View Details', onPress: () => Alert.alert('Request Details', `Location: ${request.location || 'N/A'}\nType: ${request.property_type || 'N/A'}\nBudget: ${request.budget || 'N/A'}\nStatus: ${request.status || 'N/A'}`) },
+            { text: 'Edit Request', onPress: () => navigation.navigate('TenantLead', { editLead: request }) },
             { text: request.status === 'active' ? 'Pause' : 'Activate', onPress: () => toggleStatus(request) },
         ];
 

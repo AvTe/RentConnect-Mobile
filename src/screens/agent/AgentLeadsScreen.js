@@ -58,6 +58,15 @@ const AgentLeadsScreen = ({ navigation }) => {
     const [creditBalance, setCreditBalance] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [totalLeads, setTotalLeads] = useState(0);
+    const [sortBy, setSortBy] = useState('newest');
+    const [showSortMenu, setShowSortMenu] = useState(false);
+
+    const SORT_OPTIONS = [
+        { key: 'newest', label: 'Newest First', icon: 'clock' },
+        { key: 'budget_high', label: 'Budget: High → Low', icon: 'trending-up' },
+        { key: 'budget_low', label: 'Budget: Low → High', icon: 'trending-down' },
+        { key: 'slots', label: 'Most Slots Available', icon: 'layers' },
+    ];
 
     const activeLeads = useMemo(() => {
         return leads.filter(lead => {
@@ -220,6 +229,21 @@ const AgentLeadsScreen = ({ navigation }) => {
             lead.property_type?.toLowerCase().includes(query) ||
             lead.tenant_name?.toLowerCase().includes(query)
         );
+    }).sort((a, b) => {
+        switch (sortBy) {
+            case 'budget_high':
+                return (b.budget || 0) - (a.budget || 0);
+            case 'budget_low':
+                return (a.budget || 0) - (b.budget || 0);
+            case 'slots': {
+                const slotsA = (a.max_slots || 3) - (a.claimed_slots || 0);
+                const slotsB = (b.max_slots || 3) - (b.claimed_slots || 0);
+                return slotsB - slotsA;
+            }
+            case 'newest':
+            default:
+                return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        }
     });
 
     const LeadCard = ({ lead }) => {
@@ -509,6 +533,40 @@ const AgentLeadsScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Sort Row */}
+                <TouchableOpacity
+                    style={[styles.sortRow, { borderColor: colors.border }]}
+                    onPress={() => setShowSortMenu(!showSortMenu)}
+                    activeOpacity={0.7}
+                >
+                    <Feather name="bar-chart-2" size={14} color={COLORS.primary} />
+                    <Text style={styles.sortLabel}>
+                        {SORT_OPTIONS.find(s => s.key === sortBy)?.label || 'Newest First'}
+                    </Text>
+                    <Feather name={showSortMenu ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+                {showSortMenu && (
+                    <View style={[styles.sortMenu, { borderColor: colors.border }]}>
+                        {SORT_OPTIONS.map((opt) => (
+                            <TouchableOpacity
+                                key={opt.key}
+                                style={[styles.sortMenuItem, sortBy === opt.key && styles.sortMenuItemActive]}
+                                onPress={() => { setSortBy(opt.key); setShowSortMenu(false); }}
+                            >
+                                <Feather name={opt.icon} size={15}
+                                    color={sortBy === opt.key ? COLORS.primary : COLORS.textSecondary} />
+                                <Text style={[styles.sortMenuText,
+                                    sortBy === opt.key && { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' }]}>
+                                    {opt.label}
+                                </Text>
+                                {sortBy === opt.key && (
+                                    <Feather name="check" size={16} color={COLORS.primary} style={{ marginLeft: 'auto' }} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
                 {/* Leads List */}
                 <View style={styles.leadsList}>
                     {filteredLeads.length === 0 ? (
@@ -684,6 +742,48 @@ const styles = StyleSheet.create({
     filterBtnText: {
         fontSize: 12,
         fontFamily: 'DMSans_500Medium',
+    },
+    // Sort
+    sortRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginHorizontal: 20,
+        marginBottom: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    sortLabel: {
+        flex: 1,
+        fontSize: 13,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.text,
+    },
+    sortMenu: {
+        marginHorizontal: 20,
+        marginBottom: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    sortMenuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 13,
+        gap: 10,
+    },
+    sortMenuItemActive: {
+        backgroundColor: '#FFF5E6',
+    },
+    sortMenuText: {
+        fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.text,
     },
     scrollView: {
         flex: 1,
