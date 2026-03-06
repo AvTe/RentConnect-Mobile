@@ -35,17 +35,13 @@ const AgentSettingsScreen = ({ navigation }) => {
 
     const handleTogglePush = useCallback(async (value) => {
         setPushNotifications(value);
-        if (user?.id) {
-            await updateUser(user.id, { push_notifications: value }).catch(() => {});
-        }
-    }, [user?.id]);
+        // push_notifications column may not exist yet — keep as local preference
+    }, []);
 
     const handleToggleEmail = useCallback(async (value) => {
         setEmailAlerts(value);
-        if (user?.id) {
-            await updateUser(user.id, { email_alerts: value }).catch(() => {});
-        }
-    }, [user?.id]);
+        // email_alerts column may not exist yet — keep as local preference
+    }, []);
 
     const handleSignOut = () => {
         Alert.alert(
@@ -147,7 +143,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         iconBg="#F3F4F6"
                         iconColor="#6B7280"
                         title="Privacy & Security"
-                        onPress={() => toast.info('Privacy settings coming soon')}
+                        onPress={() => navigation.navigate('PrivacyPolicy')}
                     />
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
@@ -155,7 +151,7 @@ const AgentSettingsScreen = ({ navigation }) => {
                         iconBg="#F3F4F6"
                         iconColor="#6B7280"
                         title="Change Password"
-                        onPress={() => toast.info('Change password coming soon')}
+                        onPress={() => navigation.navigate('ChangePassword')}
                     />
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem

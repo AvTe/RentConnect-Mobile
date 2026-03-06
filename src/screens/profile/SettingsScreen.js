@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,33 +7,40 @@ import {
     TouchableOpacity,
     Switch,
     Alert,
-    Linking,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage, availableLanguages } from '../../context/LanguageContext';
-
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    error: '#EF4444',
-};
+import { updateUser } from '../../lib/database';
 
 const SettingsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
-    const { user, signOut } = useAuth();
+    const toast = useToast();
+    const { user, userData, signOut } = useAuth();
     const { colors } = useTheme();
     const { language, t } = useLanguage();
     const [pushNotifications, setPushNotifications] = useState(true);
-    const [emailNotifications, setEmailNotifications] = useState(false);
+    const [emailAlerts, setEmailAlerts] = useState(false);
+
+    useEffect(() => {
+        if (userData) {
+            setPushNotifications(userData.push_notifications !== false);
+            setEmailAlerts(userData.email_alerts === true);
+        }
+    }, [userData]);
+
+    const handleTogglePush = useCallback(async (value) => {
+        setPushNotifications(value);
+        // push_notifications column may not exist yet — keep as local preference
+    }, []);
+
+    const handleToggleEmail = useCallback(async (value) => {
+        setEmailAlerts(value);
+        // email_alerts column may not exist yet — keep as local preference
+    }, []);
 
     const handleSignOut = () => {
         Alert.alert(
@@ -46,29 +53,31 @@ const SettingsScreen = ({ navigation }) => {
         );
     };
 
-    const getUserId = () => {
-        if (user?.id) {
-            return `${user.id.substring(0, 8).toUpperCase()}`;
-        }
-        return 'N/A';
+    const getUserName = () => {
+        if (userData?.name) return userData.name;
+        if (user?.email) return user.email.split('@')[0];
+        return 'Tenant';
     };
 
-
+    const getUserInitials = () => {
+        const name = getUserName();
+        return name.charAt(0).toUpperCase();
+    };
 
     const getCurrentLanguage = () => {
         const lang = availableLanguages.find(l => l.code === language);
         return lang ? `${lang.flag} ${lang.name}` : 'English';
     };
 
-    const SettingItem = ({ icon, iconColor, iconBg, title, subtitle, value, onPress, rightElement }) => (
+    const SettingItem = ({ icon, iconBg, iconColor, title, subtitle, value, onPress, rightElement }) => (
         <TouchableOpacity
             style={[styles.settingItem, { backgroundColor: colors.card }]}
             onPress={onPress}
             activeOpacity={onPress ? 0.7 : 1}
-            disabled={!onPress}
+            disabled={!onPress && !rightElement}
         >
-            <View style={[styles.settingIcon, { backgroundColor: iconBg }]}>
-                <Feather name={icon} size={18} color={iconColor} />
+            <View style={[styles.settingIcon, { backgroundColor: iconBg || colors.background }]}>
+                <Feather name={icon} size={18} color={iconColor || colors.textSecondary} />
             </View>
             <View style={styles.settingContent}>
                 <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
@@ -77,7 +86,7 @@ const SettingsScreen = ({ navigation }) => {
             {value && <Text style={[styles.settingValue, { color: colors.textSecondary }]}>{value}</Text>}
             {rightElement}
             {onPress && !rightElement && (
-                <Feather name="chevron-right" size={20} color={colors.textSecondary} />
+                <Feather name="chevron-right" size={18} color={colors.textSecondary} />
             )}
         </TouchableOpacity>
     );
@@ -86,11 +95,14 @@ const SettingsScreen = ({ navigation }) => {
         <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
             {/* Header */}
             <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Feather name="chevron-left" size={24} color={colors.text} />
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Feather name="arrow-left" size={22} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>{t('settings')}</Text>
-                <View style={styles.placeholder} />
+                <View style={styles.headerPlaceholder} />
             </View>
 
             <ScrollView
@@ -98,131 +110,138 @@ const SettingsScreen = ({ navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Language */}
+                {/* Profile Card */}
+                <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.profileAvatar, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}>
+                        <Text style={[styles.avatarText, { color: colors.primary }]}>{getUserInitials()}</Text>
+                    </View>
+                    <View style={styles.profileInfo}>
+                        <Text style={[styles.profileName, { color: colors.text }]}>{getUserName()}</Text>
+                        <Text style={[styles.profileRole, { color: colors.textSecondary }]}>Yoombaa Tenant</Text>
+                    </View>
+                </View>
+
+                {/* Language Section */}
                 <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('language').toUpperCase()}</Text>
-                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="globe"
-                        iconColor="#10B981"
                         iconBg="#D1FAE5"
+                        iconColor="#10B981"
                         title={t('language')}
                         value={getCurrentLanguage()}
                         onPress={() => navigation.navigate('LanguageSettings')}
                     />
                 </View>
 
-                {/* Account Settings */}
-                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('accountSettings').toUpperCase()}</Text>
-                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+                {/* Account Section */}
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ACCOUNT</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="lock"
-                        iconColor="#F59E0B"
-                        iconBg="#FEF3C7"
-                        title={t('passwordSecurity')}
-                        onPress={() => Alert.alert(t('comingSoon') || 'Coming Soon', t('featureComingSoon') || 'This feature will be available in a future update.')}
+                        iconBg="#F3F4F6"
+                        iconColor="#6B7280"
+                        title="Privacy & Security"
+                        onPress={() => navigation.navigate('PrivacyPolicy')}
                     />
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
-                        icon="eye"
-                        iconColor="#3B82F6"
-                        iconBg="#DBEAFE"
-                        title={t('privacySettings')}
-                        onPress={() => Alert.alert(t('comingSoon') || 'Coming Soon', t('featureComingSoon') || 'This feature will be available in a future update.')}
+                        icon="key"
+                        iconBg="#F3F4F6"
+                        iconColor="#6B7280"
+                        title="Change Password"
+                        onPress={() => navigation.navigate('ChangePassword')}
                     />
                 </View>
 
-                {/* Notifications */}
-                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('notifications') || 'NOTIFICATIONS'}</Text>
-                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+                {/* Preferences Section */}
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>PREFERENCES</Text>
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="bell"
-                        iconColor="#8B5CF6"
-                        iconBg="#EDE9FE"
-                        title={t('pushNotifications') || 'Push Notifications'}
-                        subtitle={t('dailyUpdates') || 'Daily updates & alerts'}
+                        iconBg="#FEF3C7"
+                        iconColor="#F59E0B"
+                        title="Push Notifications"
+                        subtitle="For requests and messages"
                         rightElement={
                             <Switch
                                 value={pushNotifications}
-                                onValueChange={setPushNotifications}
-                                trackColor={{ false: '#E5E7EB', true: colors.primary || COLORS.primary }}
+                                onValueChange={handleTogglePush}
+                                trackColor={{ false: '#E5E7EB', true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         }
                     />
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
-                        icon="at-sign"
-                        iconColor="#EC4899"
-                        iconBg="#FCE7F3"
-                        title={t('emailNotifications') || 'Email Notifications'}
-                        subtitle={t('weeklyNewsletters') || 'Weekly newsletters'}
+                        icon="mail"
+                        iconBg="#EDE9FE"
+                        iconColor="#8B5CF6"
+                        title="Email Alerts"
+                        subtitle="Weekly summaries"
                         rightElement={
                             <Switch
-                                value={emailNotifications}
-                                onValueChange={setEmailNotifications}
-                                trackColor={{ false: '#E5E7EB', true: colors.primary || COLORS.primary }}
+                                value={emailAlerts}
+                                onValueChange={handleToggleEmail}
+                                trackColor={{ false: '#E5E7EB', true: colors.primary }}
                                 thumbColor="#FFFFFF"
                             />
                         }
                     />
                 </View>
 
-                {/* App Info */}
-                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('appInfo') || 'APP INFO'}</Text>
-                <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+                {/* About / Help Section */}
+                <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <SettingItem
                         icon="info"
-                        iconColor="#6B7280"
                         iconBg="#F3F4F6"
-                        title={t('aboutYoombaa') || 'About Yoombaa'}
-                        value="v2.4.1"
-                        onPress={() => Alert.alert('About Yoombaa', 'Yoombaa v2.4.1\nRental marketplace connecting tenants with agents.\n\n© 2026 Yoombaa. All rights reserved.')}
+                        iconColor="#6B7280"
+                        title="About Yoombaa"
+                        onPress={() => toast.info('About coming soon')}
                     />
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="file-text"
-                        iconColor="#6B7280"
                         iconBg="#F3F4F6"
-                        title={t('termsOfService') || 'Terms of Service'}
-                        onPress={() => Linking.openURL('https://yoombaa.com/terms').catch(() => Alert.alert('Error', 'Could not open link'))}
+                        iconColor="#6B7280"
+                        title={t('termsOfService')}
+                        onPress={() => toast.info('Terms of service coming soon')}
+                    />
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    <SettingItem
+                        icon="help-circle"
+                        iconBg="#F3F4F6"
+                        iconColor="#6B7280"
+                        title={t('helpSupport')}
+                        onPress={() => navigation.navigate('Support')}
                     />
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <SettingItem
                         icon="message-circle"
-                        iconColor="#10B981"
                         iconBg="#D1FAE5"
+                        iconColor="#10B981"
                         title="My Support Tickets"
                         onPress={() => navigation.navigate('TicketList')}
                     />
                 </View>
 
-                {/* Help Card */}
-                <View style={styles.helpCard}>
-                    <View style={styles.helpIconContainer}>
-                        <Feather name="headphones" size={24} color="#FFFFFF" />
-                    </View>
-                    <View style={styles.helpContent}>
-                        <Text style={styles.helpTitle}>Need help?</Text>
-                        <Text style={styles.helpSubtitle}>Our team is available 24/7</Text>
-                    </View>
-                    <TouchableOpacity style={styles.chatBtn} onPress={() => navigation.navigate('Support')}>
-                        <Text style={styles.chatBtnText}>Chat</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Sign Out */}
-                <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
-                    <Feather name="log-out" size={20} color={COLORS.error} />
-                    <Text style={styles.signOutText}>Sign Out</Text>
+                {/* Sign Out Button */}
+                <TouchableOpacity
+                    style={[styles.signOutButton, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}
+                    onPress={handleSignOut}
+                    activeOpacity={0.8}
+                >
+                    <Text style={[styles.signOutText, { color: colors.primary }]}>Log Out</Text>
                 </TouchableOpacity>
 
                 {/* Footer */}
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>User ID: {getUserId()}</Text>
-                    <Text style={styles.footerText}>Made with ❤️ in Nairobi</Text>
-                </View>
+                <Text style={[styles.versionText, { color: colors.textSecondary }]}>Yoombaa</Text>
+                <Text style={[styles.versionNumber, { color: colors.textSecondary }]}>
+                    {user?.id ? `User ID: ${user.id.slice(0, 8)}...` : ''}
+                </Text>
+                <Text style={[styles.madeWith, { color: colors.textSecondary }]}>Made with ❤️ in Nairobi</Text>
 
-                <View style={{ height: 100 }} />
+                <View style={{ height: 40 }} />
             </ScrollView>
         </View>
     );
@@ -231,7 +250,6 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
     },
     header: {
         flexDirection: 'row',
@@ -239,20 +257,20 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: COLORS.card,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
     },
-    backBtn: {
-        padding: 4,
+    backButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '600',
-        color: COLORS.text,
+        fontFamily: 'DMSans_600SemiBold',
     },
-    placeholder: {
-        width: 32,
+    headerPlaceholder: {
+        width: 40,
     },
     scrollView: {
         flex: 1,
@@ -260,19 +278,50 @@ const styles = StyleSheet.create({
     scrollContent: {
         padding: 20,
     },
+    profileCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 24,
+        borderWidth: 1,
+    },
+    profileAvatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+    },
+    avatarText: {
+        fontSize: 22,
+        fontFamily: 'DMSans_700Bold',
+    },
+    profileInfo: {
+        marginLeft: 14,
+    },
+    profileName: {
+        fontSize: 18,
+        fontFamily: 'DMSans_700Bold',
+    },
+    profileRole: {
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        marginTop: 2,
+    },
     sectionLabel: {
         fontSize: 12,
-        fontWeight: '600',
-        color: COLORS.textSecondary,
-        marginBottom: 12,
-        marginTop: 8,
+        fontFamily: 'DMSans_600SemiBold',
         letterSpacing: 0.5,
+        marginBottom: 10,
+        marginTop: 8,
     },
     sectionCard: {
-        backgroundColor: COLORS.card,
         borderRadius: 16,
         marginBottom: 16,
         overflow: 'hidden',
+        borderWidth: 1,
     },
     settingItem: {
         flexDirection: 'row',
@@ -286,95 +335,57 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 14,
     },
     settingContent: {
         flex: 1,
+        marginLeft: 14,
     },
     settingTitle: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: COLORS.text,
+        fontSize: 15,
+        fontFamily: 'DMSans_500Medium',
     },
     settingSubtitle: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
         marginTop: 2,
     },
     settingValue: {
         fontSize: 14,
-        color: COLORS.textSecondary,
+        fontFamily: 'DMSans_400Regular',
         marginRight: 8,
     },
     divider: {
         height: 1,
-        backgroundColor: COLORS.border,
         marginLeft: 70,
     },
-    helpCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.primaryLight,
-        borderRadius: 16,
-        padding: 18,
-        marginTop: 8,
-        marginBottom: 24,
-    },
-    helpIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 14,
-    },
-    helpContent: {
-        flex: 1,
-    },
-    helpTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: COLORS.text,
-    },
-    helpSubtitle: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
-        marginTop: 2,
-    },
-    chatBtn: {
-        backgroundColor: COLORS.card,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: COLORS.primary,
-    },
-    chatBtnText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: COLORS.primary,
-    },
-    signOutBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+    signOutButton: {
         paddingVertical: 16,
+        borderRadius: 14,
+        alignItems: 'center',
+        marginTop: 8,
+        borderWidth: 1,
     },
     signOutText: {
         fontSize: 16,
-        fontWeight: '600',
-        color: COLORS.error,
+        fontFamily: 'DMSans_600SemiBold',
     },
-    footer: {
-        alignItems: 'center',
-        marginTop: 16,
+    versionText: {
+        textAlign: 'center',
+        fontSize: 13,
+        fontFamily: 'DMSans_400Regular',
+        marginTop: 20,
     },
-    footerText: {
+    versionNumber: {
+        textAlign: 'center',
         fontSize: 12,
-        color: COLORS.textSecondary,
-        marginBottom: 4,
+        fontFamily: 'DMSans_400Regular',
+        marginTop: 4,
+    },
+    madeWith: {
+        textAlign: 'center',
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        marginTop: 4,
     },
 });
 

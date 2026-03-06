@@ -1,9 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, StyleSheet, Text } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, TextInput, StyleSheet, Text, Dimensions } from 'react-native';
+
+const screenWidth = Dimensions.get('window').width;
 
 const OTPInput = ({ length = 6, onComplete, error }) => {
     const [otp, setOtp] = useState(Array(length).fill(''));
     const inputRefs = useRef([]);
+
+    // Calculate box size to fit screen with padding (24px each side) and gaps
+    const availableWidth = screenWidth - 48 - 16; // 48px total horizontal padding, 16px safety margin
+    const gapSize = 10;
+    const totalGaps = (length - 1) * gapSize;
+    const boxSize = Math.min(48, Math.floor((availableWidth - totalGaps) / length));
 
     const handleChange = (text, index) => {
         if (!/^\d*$/.test(text)) return;
@@ -49,6 +57,7 @@ const OTPInput = ({ length = 6, onComplete, error }) => {
                         maxLength={1}
                         style={[
                             styles.otpInput,
+                            { width: boxSize, height: boxSize + 8 },
                             digit && styles.otpInputFilled,
                             error && styles.otpInputError,
                         ]}

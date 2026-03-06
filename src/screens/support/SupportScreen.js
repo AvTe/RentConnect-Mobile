@@ -5,8 +5,8 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Alert,
     Linking,
+    Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -58,6 +58,10 @@ const SupportScreen = ({ navigation }) => {
         setExpandedFaq(expandedFaq === id ? null : id);
     };
 
+    const openLink = (url, errorMsg) => {
+        Linking.openURL(url).catch(() => Alert.alert('Error', errorMsg || 'Could not open link'));
+    };
+
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {/* Header */}
@@ -74,7 +78,7 @@ const SupportScreen = ({ navigation }) => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Contact Card */}
+                {/* Hero Contact Card */}
                 <View style={styles.contactCard}>
                     <View style={styles.contactIconContainer}>
                         <Feather name="headphones" size={28} color="#FFFFFF" />
@@ -87,19 +91,33 @@ const SupportScreen = ({ navigation }) => {
 
                 {/* Contact Options */}
                 <View style={styles.optionsRow}>
-                    <TouchableOpacity style={styles.optionCard} onPress={() => Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}`).catch(() => Alert.alert('Error', 'Could not open WhatsApp'))}>
+                    <TouchableOpacity
+                        style={styles.optionCard}
+                        onPress={() => openLink(`https://wa.me/${SUPPORT_WHATSAPP}`, 'Could not open WhatsApp')}
+                        activeOpacity={0.7}
+                    >
                         <View style={[styles.optionIcon, { backgroundColor: '#D1FAE5' }]}>
                             <Feather name="message-circle" size={22} color="#059669" />
                         </View>
                         <Text style={styles.optionText}>WhatsApp</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.optionCard} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => Alert.alert('Error', 'Could not open email client'))}>
+
+                    <TouchableOpacity
+                        style={styles.optionCard}
+                        onPress={() => openLink(`mailto:${SUPPORT_EMAIL}`, 'Could not open email client')}
+                        activeOpacity={0.7}
+                    >
                         <View style={[styles.optionIcon, { backgroundColor: '#DBEAFE' }]}>
                             <Feather name="mail" size={22} color="#2563EB" />
                         </View>
                         <Text style={styles.optionText}>Email Us</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.optionCard} onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => Alert.alert('Error', 'Could not open phone dialer'))}>
+
+                    <TouchableOpacity
+                        style={styles.optionCard}
+                        onPress={() => openLink(`tel:${SUPPORT_PHONE}`, 'Could not open phone dialer')}
+                        activeOpacity={0.7}
+                    >
                         <View style={[styles.optionIcon, { backgroundColor: '#EDE9FE' }]}>
                             <Feather name="phone" size={22} color="#7C3AED" />
                         </View>
@@ -135,17 +153,19 @@ const SupportScreen = ({ navigation }) => {
                 <TouchableOpacity
                     style={styles.ticketBtn}
                     onPress={() => navigation.navigate('TicketList')}
+                    activeOpacity={0.9}
                 >
                     <Feather name="list" size={20} color="#FFFFFF" />
                     <Text style={styles.ticketBtnText}>View My Tickets</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.ticketBtn, { backgroundColor: COLORS.primaryLight, marginTop: 10 }]}
+                    style={styles.ticketBtnOutline}
                     onPress={() => navigation.navigate('CreateTicket')}
+                    activeOpacity={0.9}
                 >
                     <Feather name="plus" size={20} color={COLORS.primary} />
-                    <Text style={[styles.ticketBtnText, { color: COLORS.primary }]}>Create Support Ticket</Text>
+                    <Text style={styles.ticketBtnOutlineText}>Create Support Ticket</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 40 }} />
@@ -170,15 +190,18 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
     },
     backBtn: {
-        padding: 4,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '600',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     placeholder: {
-        width: 32,
+        width: 40,
     },
     scrollView: {
         flex: 1,
@@ -208,31 +231,29 @@ const styles = StyleSheet.create({
     },
     contactTitle: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
         marginBottom: 4,
     },
     contactSubtitle: {
         fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
         color: 'rgba(255,255,255,0.9)',
     },
     optionsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 28,
+        gap: 10,
     },
     optionCard: {
         flex: 1,
         backgroundColor: COLORS.card,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: 16,
         alignItems: 'center',
-        marginHorizontal: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     optionIcon: {
         width: 48,
@@ -244,20 +265,22 @@ const styles = StyleSheet.create({
     },
     optionText: {
         fontSize: 13,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         marginBottom: 16,
     },
     faqCard: {
         backgroundColor: COLORS.card,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     faqHeader: {
         flexDirection: 'row',
@@ -266,13 +289,14 @@ const styles = StyleSheet.create({
     },
     faqQuestion: {
         fontSize: 15,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         flex: 1,
         paddingRight: 12,
     },
     faqAnswer: {
         fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         lineHeight: 22,
         marginTop: 12,
@@ -292,8 +316,26 @@ const styles = StyleSheet.create({
     },
     ticketBtnText: {
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: '#FFFFFF',
+    },
+    ticketBtnOutline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.primaryLight,
+        borderRadius: 14,
+        paddingVertical: 16,
+        marginTop: 10,
+        gap: 8,
+        borderWidth: 1.5,
+        borderColor: COLORS.primary,
+        borderStyle: 'dashed',
+    },
+    ticketBtnOutlineText: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.primary,
     },
 });
 

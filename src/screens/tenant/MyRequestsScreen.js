@@ -8,12 +8,16 @@ import {
     RefreshControl,
     ActivityIndicator,
     Alert,
+    Modal,
+    Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { getTenantLeads, updateLeadStatus, deleteLead } from '../../lib/leadService';
+
+const { width } = Dimensions.get('window');
 
 const COLORS = {
     primary: '#FE9200',
@@ -22,7 +26,15 @@ const COLORS = {
     card: '#FFFFFF',
     text: '#1F2937',
     textSecondary: '#6B7280',
+    textLight: '#9CA3AF',
     border: '#E5E7EB',
+    success: '#10B981',
+    successLight: '#D1FAE5',
+    warning: '#F59E0B',
+    warningLight: '#FEF3C7',
+    error: '#EF4444',
+    errorLight: '#FEE2E2',
+    purple: '#8B5CF6',
 };
 
 const STATUS_COLORS = {
@@ -30,6 +42,8 @@ const STATUS_COLORS = {
     paused: { bg: '#FEF3C7', text: '#D97706' },
     expired: { bg: '#F3F4F6', text: '#6B7280' },
     sold_out: { bg: '#FEE2E2', text: '#DC2626' },
+    converted: { bg: '#DBEAFE', text: '#2563EB' },
+    completed: { bg: '#D1FAE5', text: '#059669' },
 };
 
 const MyRequestsScreen = ({ navigation }) => {
@@ -40,10 +54,14 @@ const MyRequestsScreen = ({ navigation }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [requests, setRequests] = useState([]);
 
+    // Modal states
+    const [manageModalVisible, setManageModalVisible] = useState(false);
+    const [detailModalVisible, setDetailModalVisible] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState(null);
+
     const fetchRequests = useCallback(async () => {
         try {
             const result = await getTenantLeads(user?.email);
-
             if (result.success && result.data) {
                 setRequests(result.data);
             }
@@ -66,66 +84,72 @@ const MyRequestsScreen = ({ navigation }) => {
     };
 
     const handleManage = (request) => {
-        const actions = [
-            { text: 'View Details', onPress: () => Alert.alert('Request Details', `Location: ${request.location || 'N/A'}\nType: ${request.property_type || 'N/A'}\nBudget: ${request.budget || 'N/A'}\nStatus: ${request.status || 'N/A'}`) },
-            { text: 'Edit Request', onPress: () => navigation.navigate('TenantLead', { editLead: request }) },
-            { text: request.status === 'active' ? 'Pause' : 'Activate', onPress: () => toggleStatus(request) },
-        ];
-
-        // Add Rate Agent option for completed/converted leads
-        if (request.status === 'converted' || request.status === 'completed') {
-            actions.push({
-                text: 'Rate Agent',
-                onPress: () => navigation.navigate('SubmitRating', { leadId: request.id }),
-            });
-        }
-
-        actions.push(
-            { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(request) },
-            { text: 'Cancel', style: 'cancel' }
-        );
-
-        Alert.alert('Manage Request', 'What would you like to do?', actions);
+        setSelectedRequest(request);
+        setManageModalVisible(true);
     };
 
-    const toggleStatus = async (request) => {
-        const newStatus = request.status === 'active' ? 'paused' : 'active';
+    const handleViewDetails = () => {
+        setManageModalVisible(false);
+        setTimeout(() => setDetailModalVisible(true), 200);
+    };
+
+    const handleEditRequest = () => {
+        setManageModalVisible(false);
+        navigation.navigate('TenantLead', { editLead: selectedRequest });
+    };
+
+    const handleToggleStatus = async () => {
+        if (!selectedRequest) return;
+        const newStatus = selectedRequest.status === 'active' ? 'paused' : 'active';
+        setManageModalVisible(false);
         try {
-            const result = await updateLeadStatus(request.id, newStatus);
+            const result = await updateLeadStatus(selectedRequest.id, newStatus);
             if (!result.success) throw new Error(result.error);
             fetchRequests();
-            toast.success('Status updated successfully');
+            toast.success(`Request ${newStatus === 'paused' ? 'paused' : 'activated'} successfully`);
         } catch (error) {
             console.error('Toggle status error:', error);
             toast.error('Failed to update status');
         }
     };
 
-    const confirmDelete = (request) => {
+    const handleRateAgent = () => {
+        setManageModalVisible(false);
+        navigation.navigate('SubmitRating', { leadId: selectedRequest?.id });
+    };
+
+    const handleDelete = () => {
+        setManageModalVisible(false);
         Alert.alert(
             'Delete Request',
             'Are you sure you want to delete this request? This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => deleteRequest(request) },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const result = await deleteLead(selectedRequest.id);
+                            if (!result.success) throw new Error(result.error);
+                            fetchRequests();
+                            toast.success('Request deleted successfully');
+                        } catch (error) {
+                            console.error('Delete request error:', error);
+                            toast.error('Failed to delete request');
+                        }
+                    },
+                },
             ]
         );
     };
 
-    const deleteRequest = async (request) => {
-        try {
-            const result = await deleteLead(request.id);
-            if (!result.success) throw new Error(result.error);
-            fetchRequests();
-            toast.success('Request deleted successfully');
-        } catch (error) {
-            console.error('Delete request error:', error);
-            toast.error('Failed to delete request');
-        }
-    };
-
     const getStatusStyle = (status) => {
         return STATUS_COLORS[status] || STATUS_COLORS.expired;
+    };
+
+    const formatBudget = (budget) => {
+        return parseInt(budget || 0).toLocaleString();
     };
 
     if (loading) {
@@ -149,8 +173,8 @@ const MyRequestsScreen = ({ navigation }) => {
                     onPress={() => navigation.navigate('TenantLead')}
                     activeOpacity={0.9}
                 >
-                    <Feather name="plus" size={18} color="#FFFFFF" />
-                    <Text style={styles.newRequestText}>New{'\n'}Request</Text>
+                    <Feather name="plus" size={14} color="#FFFFFF" />
+                    <Text style={styles.newRequestText}>New Request</Text>
                 </TouchableOpacity>
             </View>
 
@@ -193,7 +217,7 @@ const MyRequestsScreen = ({ navigation }) => {
                                     Posted {new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                                 </Text>
                                 <View style={styles.budgetSection}>
-                                    <Text style={styles.budgetAmount}>KSh {parseInt(request.budget || 0).toLocaleString()}</Text>
+                                    <Text style={styles.budgetAmount}>KSh {formatBudget(request.budget)}</Text>
                                     <Text style={styles.budgetPeriod}>/ MONTH</Text>
                                 </View>
                             </View>
@@ -237,6 +261,271 @@ const MyRequestsScreen = ({ navigation }) => {
 
                 <View style={{ height: 100 }} />
             </ScrollView>
+
+            {/* ===== Manage Request Modal (Bottom Sheet Style) ===== */}
+            <Modal
+                visible={manageModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setManageModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setManageModalVisible(false)}
+                >
+                    <View style={styles.manageSheet} onStartShouldSetResponder={() => true}>
+                        {/* Handle bar */}
+                        <View style={styles.sheetHandle} />
+
+                        <Text style={styles.sheetTitle}>Manage Request</Text>
+                        {selectedRequest && (
+                            <Text style={styles.sheetSubtitle}>
+                                {selectedRequest.property_type || 'Property'} in {selectedRequest.location}
+                            </Text>
+                        )}
+
+                        <View style={styles.sheetActions}>
+                            <TouchableOpacity style={styles.sheetAction} onPress={handleViewDetails}>
+                                <View style={[styles.sheetActionIcon, { backgroundColor: '#DBEAFE' }]}>
+                                    <Feather name="file-text" size={18} color="#3B82F6" />
+                                </View>
+                                <View style={styles.sheetActionContent}>
+                                    <Text style={styles.sheetActionTitle}>View Details</Text>
+                                    <Text style={styles.sheetActionDesc}>See full request information</Text>
+                                </View>
+                                <Feather name="chevron-right" size={18} color={COLORS.textLight} />
+                            </TouchableOpacity>
+
+                            <View style={styles.sheetDivider} />
+
+                            <TouchableOpacity style={styles.sheetAction} onPress={handleEditRequest}>
+                                <View style={[styles.sheetActionIcon, { backgroundColor: COLORS.primaryLight }]}>
+                                    <Feather name="edit-2" size={18} color={COLORS.primary} />
+                                </View>
+                                <View style={styles.sheetActionContent}>
+                                    <Text style={styles.sheetActionTitle}>Edit Request</Text>
+                                    <Text style={styles.sheetActionDesc}>Modify your request details</Text>
+                                </View>
+                                <Feather name="chevron-right" size={18} color={COLORS.textLight} />
+                            </TouchableOpacity>
+
+                            <View style={styles.sheetDivider} />
+
+                            <TouchableOpacity style={styles.sheetAction} onPress={handleToggleStatus}>
+                                <View style={[styles.sheetActionIcon, {
+                                    backgroundColor: selectedRequest?.status === 'active' ? COLORS.warningLight : COLORS.successLight
+                                }]}>
+                                    <Feather
+                                        name={selectedRequest?.status === 'active' ? 'pause-circle' : 'play-circle'}
+                                        size={18}
+                                        color={selectedRequest?.status === 'active' ? COLORS.warning : COLORS.success}
+                                    />
+                                </View>
+                                <View style={styles.sheetActionContent}>
+                                    <Text style={styles.sheetActionTitle}>
+                                        {selectedRequest?.status === 'active' ? 'Pause Request' : 'Activate Request'}
+                                    </Text>
+                                    <Text style={styles.sheetActionDesc}>
+                                        {selectedRequest?.status === 'active' ? 'Temporarily stop agent views' : 'Make visible to agents again'}
+                                    </Text>
+                                </View>
+                                <Feather name="chevron-right" size={18} color={COLORS.textLight} />
+                            </TouchableOpacity>
+
+                            {(selectedRequest?.status === 'converted' || selectedRequest?.status === 'completed') && (
+                                <>
+                                    <View style={styles.sheetDivider} />
+                                    <TouchableOpacity style={styles.sheetAction} onPress={handleRateAgent}>
+                                        <View style={[styles.sheetActionIcon, { backgroundColor: '#FEF3C7' }]}>
+                                            <Feather name="star" size={18} color="#F59E0B" />
+                                        </View>
+                                        <View style={styles.sheetActionContent}>
+                                            <Text style={styles.sheetActionTitle}>Rate Agent</Text>
+                                            <Text style={styles.sheetActionDesc}>Share your experience</Text>
+                                        </View>
+                                        <Feather name="chevron-right" size={18} color={COLORS.textLight} />
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            <View style={styles.sheetDivider} />
+
+                            <TouchableOpacity style={styles.sheetAction} onPress={handleDelete}>
+                                <View style={[styles.sheetActionIcon, { backgroundColor: COLORS.errorLight }]}>
+                                    <Feather name="trash-2" size={18} color={COLORS.error} />
+                                </View>
+                                <View style={styles.sheetActionContent}>
+                                    <Text style={[styles.sheetActionTitle, { color: COLORS.error }]}>Delete Request</Text>
+                                    <Text style={styles.sheetActionDesc}>Permanently remove this request</Text>
+                                </View>
+                                <Feather name="chevron-right" size={18} color={COLORS.textLight} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.sheetCancelBtn}
+                            onPress={() => setManageModalVisible(false)}
+                        >
+                            <Text style={styles.sheetCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* ===== View Details Modal ===== */}
+            <Modal
+                visible={detailModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setDetailModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setDetailModalVisible(false)}
+                >
+                    <View style={styles.detailCard} onStartShouldSetResponder={() => true}>
+                        {/* Close button */}
+                        <TouchableOpacity
+                            style={styles.detailClose}
+                            onPress={() => setDetailModalVisible(false)}
+                        >
+                            <Feather name="x" size={20} color={COLORS.textSecondary} />
+                        </TouchableOpacity>
+
+                        {/* Header */}
+                        <View style={styles.detailHeader}>
+                            <View style={styles.detailIconWrap}>
+                                <Feather name="home" size={24} color={COLORS.primary} />
+                            </View>
+                            <Text style={styles.detailTitle}>Request Details</Text>
+                        </View>
+
+                        {selectedRequest && (
+                            <View style={styles.detailBody}>
+                                {/* Status badge */}
+                                <View style={styles.detailStatusRow}>
+                                    <View style={[styles.detailStatusBadge, {
+                                        backgroundColor: getStatusStyle(selectedRequest.status).bg
+                                    }]}>
+                                        <View style={[styles.detailStatusDot, {
+                                            backgroundColor: getStatusStyle(selectedRequest.status).text
+                                        }]} />
+                                        <Text style={[styles.detailStatusText, {
+                                            color: getStatusStyle(selectedRequest.status).text
+                                        }]}>
+                                            {selectedRequest.status?.charAt(0).toUpperCase() + selectedRequest.status?.slice(1)}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Detail rows */}
+                                <View style={styles.detailRows}>
+                                    <View style={styles.detailRow}>
+                                        <View style={styles.detailRowIcon}>
+                                            <Feather name="map-pin" size={16} color={COLORS.primary} />
+                                        </View>
+                                        <View style={styles.detailRowContent}>
+                                            <Text style={styles.detailRowLabel}>Location</Text>
+                                            <Text style={styles.detailRowValue}>{selectedRequest.location || 'N/A'}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.detailRowDivider} />
+
+                                    <View style={styles.detailRow}>
+                                        <View style={styles.detailRowIcon}>
+                                            <Feather name="home" size={16} color="#3B82F6" />
+                                        </View>
+                                        <View style={styles.detailRowContent}>
+                                            <Text style={styles.detailRowLabel}>Property Type</Text>
+                                            <Text style={styles.detailRowValue}>{selectedRequest.property_type || 'N/A'}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.detailRowDivider} />
+
+                                    <View style={styles.detailRow}>
+                                        <View style={styles.detailRowIcon}>
+                                            <Feather name="credit-card" size={16} color={COLORS.success} />
+                                        </View>
+                                        <View style={styles.detailRowContent}>
+                                            <Text style={styles.detailRowLabel}>Budget</Text>
+                                            <Text style={[styles.detailRowValue, { color: COLORS.primary, fontFamily: 'DMSans_700Bold' }]}>
+                                                KSh {formatBudget(selectedRequest.budget)}
+                                                <Text style={styles.detailBudgetPeriod}> /month</Text>
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {selectedRequest.bedrooms && (
+                                        <>
+                                            <View style={styles.detailRowDivider} />
+                                            <View style={styles.detailRow}>
+                                                <View style={styles.detailRowIcon}>
+                                                    <Feather name="layers" size={16} color={COLORS.purple} />
+                                                </View>
+                                                <View style={styles.detailRowContent}>
+                                                    <Text style={styles.detailRowLabel}>Bedrooms</Text>
+                                                    <Text style={styles.detailRowValue}>{selectedRequest.bedrooms}</Text>
+                                                </View>
+                                            </View>
+                                        </>
+                                    )}
+
+                                    {selectedRequest.move_in_date && (
+                                        <>
+                                            <View style={styles.detailRowDivider} />
+                                            <View style={styles.detailRow}>
+                                                <View style={styles.detailRowIcon}>
+                                                    <Feather name="calendar" size={16} color="#F59E0B" />
+                                                </View>
+                                                <View style={styles.detailRowContent}>
+                                                    <Text style={styles.detailRowLabel}>Move-in Date</Text>
+                                                    <Text style={styles.detailRowValue}>
+                                                        {new Date(selectedRequest.move_in_date).toLocaleDateString('en-GB', {
+                                                            day: '2-digit', month: 'short', year: 'numeric'
+                                                        })}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </>
+                                    )}
+                                </View>
+
+                                {/* Stats row */}
+                                <View style={styles.detailStatsRow}>
+                                    <View style={styles.detailStatCard}>
+                                        <Feather name="eye" size={16} color={COLORS.purple} />
+                                        <Text style={styles.detailStatValue}>{selectedRequest.views || 0}</Text>
+                                        <Text style={styles.detailStatLabel}>Views</Text>
+                                    </View>
+                                    <View style={styles.detailStatCard}>
+                                        <Feather name="users" size={16} color={COLORS.primary} />
+                                        <Text style={styles.detailStatValue}>{selectedRequest.contacts || 0}</Text>
+                                        <Text style={styles.detailStatLabel}>Contacts</Text>
+                                    </View>
+                                    <View style={styles.detailStatCard}>
+                                        <Feather name="calendar" size={16} color={COLORS.success} />
+                                        <Text style={styles.detailStatValue}>
+                                            {new Date(selectedRequest.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                        </Text>
+                                        <Text style={styles.detailStatLabel}>Posted</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.detailDoneBtn}
+                            onPress={() => setDetailModalVisible(false)}
+                        >
+                            <Text style={styles.detailDoneBtnText}>Done</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </View>
     );
 };
@@ -262,11 +551,12 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 24,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     headerSubtitle: {
         fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -274,16 +564,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.primary,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 30,
-        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+        gap: 6,
     },
     newRequestText: {
         color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
-        lineHeight: 16,
+        fontSize: 13,
+        fontFamily: 'DMSans_600SemiBold',
     },
     scrollView: {
         flex: 1,
@@ -306,12 +595,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 20,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 15,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
@@ -323,17 +613,17 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
         paddingHorizontal: 24,
         paddingVertical: 14,
-        borderRadius: 30,
+        borderRadius: 14,
         gap: 8,
     },
     createButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
     },
     requestCard: {
         backgroundColor: COLORS.card,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 18,
         marginBottom: 14,
         borderWidth: 1,
@@ -347,15 +637,16 @@ const styles = StyleSheet.create({
     statusBadge: {
         paddingHorizontal: 10,
         paddingVertical: 5,
-        borderRadius: 6,
+        borderRadius: 8,
     },
     statusText: {
         fontSize: 11,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         letterSpacing: 0.5,
     },
     postedDate: {
         fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginLeft: 12,
         flex: 1,
@@ -365,17 +656,17 @@ const styles = StyleSheet.create({
     },
     budgetAmount: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.primary,
     },
     budgetPeriod: {
         fontSize: 10,
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.textSecondary,
-        fontWeight: '500',
     },
     requestTitle: {
         fontSize: 18,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginBottom: 8,
     },
@@ -386,6 +677,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
         color: COLORS.textSecondary,
         marginLeft: 6,
     },
@@ -408,12 +700,13 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: 10,
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.textSecondary,
-        fontWeight: '500',
+        letterSpacing: 0.3,
     },
     statValue: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     manageBtn: {
@@ -423,8 +716,235 @@ const styles = StyleSheet.create({
     },
     manageText: {
         fontSize: 14,
-        fontWeight: '500',
+        fontFamily: 'DMSans_500Medium',
         color: COLORS.text,
+    },
+
+    // ===== Manage Modal (Bottom Sheet) =====
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    manageSheet: {
+        backgroundColor: COLORS.card,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 34,
+    },
+    sheetHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: COLORS.border,
+        alignSelf: 'center',
+        marginBottom: 20,
+    },
+    sheetTitle: {
+        fontSize: 20,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    sheetSubtitle: {
+        fontSize: 14,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginBottom: 20,
+    },
+    sheetActions: {
+        backgroundColor: COLORS.background,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    sheetAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+    },
+    sheetActionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    sheetActionContent: {
+        flex: 1,
+        marginLeft: 14,
+    },
+    sheetActionTitle: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+    },
+    sheetActionDesc: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+        marginTop: 2,
+    },
+    sheetDivider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+        marginLeft: 70,
+    },
+    sheetCancelBtn: {
+        marginTop: 16,
+        paddingVertical: 16,
+        borderRadius: 14,
+        backgroundColor: COLORS.background,
+        alignItems: 'center',
+    },
+    sheetCancelText: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.textSecondary,
+    },
+
+    // ===== Detail Modal =====
+    detailCard: {
+        backgroundColor: COLORS.card,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        paddingBottom: 34,
+    },
+    detailClose: {
+        position: 'absolute',
+        top: 16,
+        right: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1,
+    },
+    detailHeader: {
+        alignItems: 'center',
+        marginBottom: 24,
+        paddingTop: 8,
+    },
+    detailIconWrap: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: COLORS.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    detailTitle: {
+        fontSize: 22,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+    },
+    detailBody: {},
+    detailStatusRow: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    detailStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 20,
+        gap: 6,
+    },
+    detailStatusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    detailStatusText: {
+        fontSize: 13,
+        fontFamily: 'DMSans_600SemiBold',
+    },
+    detailRows: {
+        backgroundColor: COLORS.background,
+        borderRadius: 16,
+        overflow: 'hidden',
+        marginBottom: 20,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+    },
+    detailRowIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: COLORS.card,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    detailRowContent: {
+        flex: 1,
+        marginLeft: 14,
+    },
+    detailRowLabel: {
+        fontSize: 11,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+        marginBottom: 2,
+    },
+    detailRowValue: {
+        fontSize: 15,
+        fontFamily: 'DMSans_600SemiBold',
+        color: COLORS.text,
+    },
+    detailBudgetPeriod: {
+        fontSize: 12,
+        fontFamily: 'DMSans_400Regular',
+        color: COLORS.textSecondary,
+    },
+    detailRowDivider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+        marginLeft: 66,
+    },
+    detailStatsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 20,
+    },
+    detailStatCard: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+        borderRadius: 14,
+        padding: 14,
+        alignItems: 'center',
+        gap: 4,
+    },
+    detailStatValue: {
+        fontSize: 16,
+        fontFamily: 'DMSans_700Bold',
+        color: COLORS.text,
+    },
+    detailStatLabel: {
+        fontSize: 11,
+        fontFamily: 'DMSans_500Medium',
+        color: COLORS.textSecondary,
+    },
+    detailDoneBtn: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: 'center',
+    },
+    detailDoneBtnText: {
+        fontSize: 16,
+        fontFamily: 'DMSans_600SemiBold',
+        color: '#FFFFFF',
     },
 });
 

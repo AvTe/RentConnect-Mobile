@@ -282,7 +282,7 @@ export const addCredits = async (userId, amount, reason) => {
         }
 
         const currentBalance = parseFloat(user.wallet_balance || 0);
-        const newBalance = currentBalance + amount;
+        const newBalance = currentBalance + parsedAmount;
 
         const { error: updateError } = await supabase
             .from('users')
@@ -299,7 +299,7 @@ export const addCredits = async (userId, amount, reason) => {
         // Record transaction
         await supabase.from('credit_transactions').insert({
             user_id: userId,
-            amount,
+            amount: parsedAmount,
             type: 'credit',
             reason,
             balance_after: newBalance,
@@ -336,11 +336,11 @@ export const deductCredits = async (userId, amount, reason) => {
 
         const currentBalance = parseFloat(user.wallet_balance || 0);
 
-        if (currentBalance < amount) {
+        if (currentBalance < parsedAmount) {
             return { success: false, error: 'Insufficient credits' };
         }
 
-        const newBalance = currentBalance - amount;
+        const newBalance = currentBalance - parsedAmount;
 
         const { error: updateError } = await supabase
             .from('users')
@@ -357,7 +357,7 @@ export const deductCredits = async (userId, amount, reason) => {
         // Record transaction
         await supabase.from('credit_transactions').insert({
             user_id: userId,
-            amount,
+            amount: parsedAmount,
             type: 'debit',
             reason,
             balance_after: newBalance,

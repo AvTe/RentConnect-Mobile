@@ -49,7 +49,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     }, 1000);
   };
 
-  // STEP 1: Send reset email with 8-digit code
+  // STEP 1: Send reset email with 6-digit code
   const handleSendCode = async () => {
     if (!email.trim()) {
       toast.warning('Please enter your email address');
@@ -394,6 +394,7 @@ const styles = StyleSheet.create({
   },
   otpSection: {
     marginBottom: 24,
+    alignItems: 'center',
   },
   verifyingContainer: {
     flexDirection: 'row',

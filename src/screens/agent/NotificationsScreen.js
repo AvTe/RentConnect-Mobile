@@ -38,17 +38,37 @@ const NOTIFICATION_ICONS = {
     new_lead: { icon: 'user-plus', bg: COLORS.successLight, color: COLORS.success },
     credit_added: { icon: 'plus-circle', bg: COLORS.blueLight, color: COLORS.blue },
     credit_deducted: { icon: 'minus-circle', bg: COLORS.warningLight, color: COLORS.warning },
+    credits_added: { icon: 'plus-circle', bg: COLORS.blueLight, color: COLORS.blue },
+    credits_low: { icon: 'alert-circle', bg: COLORS.warningLight, color: COLORS.warning },
     lead_unlocked: { icon: 'unlock', bg: COLORS.primaryLight, color: COLORS.primary },
     lead_expired: { icon: 'clock', bg: COLORS.errorLight, color: COLORS.error },
     referral: { icon: 'gift', bg: COLORS.purpleLight, color: COLORS.purple },
     subscription: { icon: 'star', bg: COLORS.primaryLight, color: COLORS.primary },
+    subscription_expiry: { icon: 'star', bg: COLORS.warningLight, color: COLORS.warning },
+    subscription_renewed: { icon: 'star', bg: COLORS.successLight, color: COLORS.success },
+    // Tenant notification types
+    agent_interested: { icon: 'heart', bg: COLORS.primaryLight, color: COLORS.primary },
+    agent_contact: { icon: 'phone-call', bg: COLORS.successLight, color: COLORS.success },
+    connection_request: { icon: 'user-plus', bg: COLORS.blueLight, color: COLORS.blue },
+    connection_accepted: { icon: 'user-check', bg: COLORS.successLight, color: COLORS.success },
+    connection_rejected: { icon: 'user-x', bg: COLORS.errorLight, color: COLORS.error },
+    // Shared types
+    support: { icon: 'headphones', bg: COLORS.purpleLight, color: COLORS.purple },
+    support_response: { icon: 'message-circle', bg: COLORS.blueLight, color: COLORS.blue },
+    ticket_closed: { icon: 'check-circle', bg: COLORS.successLight, color: COLORS.success },
+    info: { icon: 'info', bg: COLORS.blueLight, color: COLORS.blue },
+    warning: { icon: 'alert-triangle', bg: COLORS.warningLight, color: COLORS.warning },
+    success: { icon: 'check-circle', bg: COLORS.successLight, color: COLORS.success },
+    error: { icon: 'x-circle', bg: COLORS.errorLight, color: COLORS.error },
+    welcome: { icon: 'smile', bg: COLORS.primaryLight, color: COLORS.primary },
+    reminder: { icon: 'clock', bg: COLORS.warningLight, color: COLORS.warning },
     system: { icon: 'bell', bg: COLORS.background, color: COLORS.textSecondary },
 };
 
 const NotificationsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
-    const { user } = useAuth();
+    const { user, isTenant } = useAuth();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -183,10 +203,13 @@ const NotificationsScreen = ({ navigation }) => {
             markAsRead(notification.id);
         }
 
+        const isTenantUser = typeof isTenant === 'function' ? isTenant() : false;
+
         // Navigate based on notification type
         switch (notification.type) {
             case 'new_lead':
             case 'lead_unlocked':
+                if (isTenantUser) break; // not relevant for tenants
                 if (notification.lead_id) {
                     navigation.navigate('LeadDetail', { leadId: notification.lead_id });
                 } else {
@@ -195,10 +218,26 @@ const NotificationsScreen = ({ navigation }) => {
                 break;
             case 'credit_added':
             case 'credit_deducted':
-                navigation.navigate('AgentWallet');
+            case 'credits_added':
+            case 'credits_low':
+                if (!isTenantUser) navigation.navigate('AgentWallet');
                 break;
             case 'referral':
-                navigation.navigate('AgentTabs', { screen: 'AgentRewards' });
+                if (!isTenantUser) navigation.navigate('AgentTabs', { screen: 'AgentRewards' });
+                break;
+            case 'agent_interested':
+            case 'agent_contact':
+            case 'connection_request':
+            case 'connection_accepted':
+            case 'connection_rejected':
+                if (isTenantUser) {
+                    navigation.navigate('TenantTabs', { screen: 'Requests' });
+                }
+                break;
+            case 'support':
+            case 'support_response':
+            case 'ticket_closed':
+                navigation.navigate('TicketList');
                 break;
             default:
                 break;
@@ -318,7 +357,7 @@ const NotificationsScreen = ({ navigation }) => {
                         <Text style={styles.emptyText}>
                             {filter === 'unread'
                                 ? 'You\'re all caught up!'
-                                : 'You\'ll see updates about leads and credits here'}
+                                : 'You\'ll see updates about your activity here'}
                         </Text>
                     </View>
                 ) : (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,20 +26,51 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const countdownRef = useRef(null);
+  const isMounted = useRef(true);
 
-  // Wait for the session to be available (it might take a moment after deep link / verifyOtp)
+  // Cleanup on unmount
   useEffect(() => {
-    if (session) {
-      setSessionReady(true);
-    } else {
-      // Give the session a moment to be set from the recovery flow
-      const timeout = setTimeout(() => {
-        setSessionReady(true); // Allow the UI to render even without a session
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-  }, [session]);
+    return () => {
+      isMounted.current = false;
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
+  // After success → 5-second countdown → auto-redirect to login
+  useEffect(() => {
+    if (!success) return;
+
+    setCountdown(5);
+    let count = 5;
+    countdownRef.current = setInterval(() => {
+      count -= 1;
+      setCountdown(count);
+      if (count <= 0) {
+        clearInterval(countdownRef.current);
+        doRedirectToLogin();
+      }
+    }, 1000);
+
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [success]);
+
+  // Clear local session + recovery mode → navigator switches to AuthStack → Landing
+  // Uses scope: 'local' to avoid hanging on a network call
+  const doRedirectToLogin = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+
+    // Clear local session instantly (no network call, won't hang)
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+
+    // Small delay to let signOut state propagate, then clear recovery mode
+    setTimeout(() => {
+      clearPasswordRecoveryMode();
+    }, 200);
+  };
 
   const validatePassword = () => {
     if (!password || password.length < 6) {
@@ -56,69 +88,93 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     if (!validatePassword()) return;
 
     if (!session) {
-      toast.error('Session expired. Please request a new password reset link.');
-      navigation.goBack();
+      toast.error('Session expired. Please request a new reset code.');
+      clearPasswordRecoveryMode();
       return;
     }
 
     setLoading(true);
+
     try {
-      const { data, error } = await supabase.auth.updateUser({
-        password: password,
-      });
+      // Wrap in a 15-second timeout to prevent infinite spinner
+      const updatePromise = supabase.auth.updateUser({ password });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+      );
+
+      const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
+
+      if (!isMounted.current) return;
 
       if (error) {
         console.error('Password update error:', error);
-        if (error.message.includes('same_password') || error.message.includes('same password')) {
-          toast.error('New password must be different from your current password.');
-        } else if (error.message.includes('weak_password') || error.message.includes('weak password')) {
-          toast.error('Password is too weak. Please choose a stronger password.');
-        } else if (error.message.includes('session_not_found') || error.message.includes('not authenticated')) {
-          toast.error('Session expired. Please request a new reset link.');
-          navigation.goBack();
-        } else {
-          toast.error(error.message || 'Failed to update password. Please try again.');
+        let msg = 'Failed to update password. Please try again.';
+        if (error.message?.includes('same_password') || error.message?.includes('same password') || error.message?.includes('different')) {
+          msg = 'New password must be different from your current password.';
+        } else if (error.message?.includes('weak_password') || error.message?.includes('weak')) {
+          msg = 'Password is too weak. Please choose a stronger password.';
+        } else if (error.message?.includes('session') || error.message?.includes('authenticated')) {
+          msg = 'Session expired. Please start the reset process again.';
+        } else if (error.message) {
+          msg = error.message;
         }
+        toast.error(msg);
+        setLoading(false);
         return;
       }
 
+      // Success!
+      setLoading(false);
       setSuccess(true);
-      toast.success('Password updated successfully!');
-
-      // Clear recovery mode and sign out after a short delay
-      // This ensures the app switches back to AuthStack before navigating to Login
-      setTimeout(async () => {
-        try {
-          clearPasswordRecoveryMode();
-          await supabase.auth.signOut();
-        } catch (e) {
-          console.warn('Error during post-reset cleanup:', e);
-        }
-        // After signOut, user becomes null → AuthStack renders → Landing screen
-        // The user will navigate to Login from there
-      }, 2500);
     } catch (err) {
-      console.error('Unexpected error updating password:', err);
-      toast.error('An unexpected error occurred. Please try again.');
-    } finally {
+      if (!isMounted.current) return;
+      console.error('Password update exception:', err);
+      if (err.message === 'TIMEOUT') {
+        toast.error('Request timed out. Please check your connection and try again.');
+      } else {
+        toast.error('An unexpected error occurred. Please try again.');
+      }
       setLoading(false);
     }
   };
 
-  // Success state
+  // Success state — Password confirmation screen with auto-redirect
   if (success) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.content}>
+        <View style={styles.successContent}>
+          {/* Checkmark circle */}
           <View style={styles.successIconContainer}>
-            <Feather name="check-circle" size={48} color="#10B981" />
+            <View style={styles.successIconInner}>
+              <Feather name="check" size={48} color="#FFFFFF" />
+            </View>
           </View>
+
           <Text style={styles.successTitle}>Password Updated!</Text>
           <Text style={styles.successDescription}>
             Your password has been successfully changed.{'\n'}
-            Redirecting you to login screen...
+            You can now log in with your new password.
           </Text>
-          <ActivityIndicator size="small" color="#FE9200" style={{ marginTop: 24 }} />
+
+          {/* Countdown */}
+          <View style={styles.countdownContainer}>
+            <View style={styles.countdownBadge}>
+              <Text style={styles.countdownNumber}>{countdown}</Text>
+            </View>
+            <Text style={styles.countdownText}>
+              Redirecting to login in {countdown} second{countdown !== 1 ? 's' : ''}...
+            </Text>
+          </View>
+
+          {/* Manual Go to Login button */}
+          <TouchableOpacity
+            style={styles.goToLoginButton}
+            onPress={doRedirectToLogin}
+            activeOpacity={0.8}
+          >
+            <Feather name="log-in" size={18} color="#FFFFFF" />
+            <Text style={styles.goToLoginText}>Go to Login Now</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -130,7 +186,11 @@ const ResetPasswordScreen = ({ navigation, route }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.headerIconContainer}>
             <Feather name="lock" size={40} color="#FE9200" />
@@ -245,7 +305,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
               <Text style={styles.primaryButtonText}>Update Password</Text>
             )}
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -259,8 +319,8 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
@@ -349,16 +409,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Success Styles
+  successContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   successIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     backgroundColor: '#D1FAE5',
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 120,
     marginBottom: 32,
+  },
+  successIconInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   successTitle: {
     fontSize: 28,
@@ -372,6 +444,47 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 32,
+  },
+  countdownContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  countdownBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF3E0',
+    borderWidth: 2,
+    borderColor: '#FE9200',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  countdownNumber: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FE9200',
+  },
+  countdownText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  goToLoginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FE9200',
+    borderRadius: 30,
+    height: 56,
+    paddingHorizontal: 32,
+    gap: 8,
+    width: '100%',
+  },
+  goToLoginText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

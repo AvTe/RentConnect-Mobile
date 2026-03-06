@@ -39,6 +39,11 @@ export const AuthProvider = ({ children }) => {
           logger.log('Password recovery mode activated');
           setPasswordRecoveryMode(true);
           setLoading(false);
+        } else if (event === 'USER_UPDATED') {
+          // Password was just updated — don't block with fetchUserData
+          // The ResetPasswordScreen handles the redirect flow
+          logger.log('User updated (password change)');
+          setLoading(false);
         } else if (event === 'SIGNED_IN' && session?.user) {
           await fetchUserData(session.user.id);
         } else if (event === 'SIGNED_OUT') {

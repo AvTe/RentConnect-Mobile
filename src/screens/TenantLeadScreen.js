@@ -34,6 +34,14 @@ import OTPInput from '../components/OTPInput';
 
 const TOTAL_STEPS = 4;
 
+// Country phone config — maps countryCode state to flag, dial code & placeholder
+const COUNTRY_PHONE_CONFIG = {
+    KE: { flag: '🇰🇪', dialCode: '+254', prefix: '254', placeholder: '712 345 678' },
+    IN: { flag: '🇮🇳', dialCode: '+91', prefix: '91', placeholder: '98765 43210' },
+    US: { flag: '🇺🇸', dialCode: '+1', prefix: '1', placeholder: '(555) 123-4567' },
+    NG: { flag: '🇳🇬', dialCode: '+234', prefix: '234', placeholder: '801 234 5678' },
+};
+
 const TenantLeadScreen = ({ navigation, route }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
@@ -191,7 +199,8 @@ const TenantLeadScreen = ({ navigation, route }) => {
             toast.warning('Please enter a valid phone number');
             return;
         }
-        const fullPhone = `+${countryCode === 'KE' ? '254' : '91'}${phone.replace(/\D/g, '')}`;
+        const phonePrefix = (COUNTRY_PHONE_CONFIG[countryCode] || COUNTRY_PHONE_CONFIG.KE).prefix;
+        const fullPhone = `+${phonePrefix}${phone.replace(/\D/g, '')}`;
         setOtpStep('sending');
         const result = await sendOTP(fullPhone);
         if (result.success) {
@@ -206,7 +215,8 @@ const TenantLeadScreen = ({ navigation, route }) => {
     };
 
     const handleVerifyOTP = async (otp) => {
-        const fullPhone = `+${countryCode === 'KE' ? '254' : '91'}${phone.replace(/\D/g, '')}`;
+        const phonePrefix = (COUNTRY_PHONE_CONFIG[countryCode] || COUNTRY_PHONE_CONFIG.KE).prefix;
+        const fullPhone = `+${phonePrefix}${phone.replace(/\D/g, '')}`;
         setOtpStep('verifying');
         setOtpError('');
         const result = await verifyOTP(fullPhone, otp);
@@ -324,6 +334,7 @@ const TenantLeadScreen = ({ navigation, route }) => {
 
             // Prepare lead data (createLead service handles pricing, slots, and notifications)
             const leadData = {
+                user_id: user?.id || null,
                 location: location.trim(),
                 property_type: propertyType,
                 bedrooms: bedrooms,
@@ -434,14 +445,14 @@ const TenantLeadScreen = ({ navigation, route }) => {
                         <>
                             <TouchableOpacity
                                 style={styles.primaryButton}
-                                onPress={() => navigation.navigate('Landing')}
+                                onPress={() => navigation.navigate('TenantTabs', { screen: 'Requests' })}
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.primaryButtonText}>View My Requests</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.secondaryButton}
-                                onPress={() => navigation.navigate('Landing')}
+                                onPress={() => navigation.navigate('TenantTabs', { screen: 'Dashboard' })}
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.secondaryButtonText}>Go to Home</Text>
@@ -604,10 +615,10 @@ const TenantLeadScreen = ({ navigation, route }) => {
                         {/* Budget Input */}
                         <View style={styles.budgetHeader}>
                             <Text style={styles.budgetLabel}>Monthly Budget</Text>
-                            <Text style={styles.budgetCurrency}>KES</Text>
+                            <Text style={styles.budgetCurrency}>{(CURRENCY_CONFIG[countryCode] || CURRENCY_CONFIG.KE).code}</Text>
                         </View>
                         <View style={styles.budgetInputContainer}>
-                            <Text style={styles.budgetPrefix}>KSh</Text>
+                            <Text style={styles.budgetPrefix}>{(CURRENCY_CONFIG[countryCode] || CURRENCY_CONFIG.KE).symbol}</Text>
                             <TextInput
                                 style={styles.budgetInput}
                                 placeholder="Enter amount"
@@ -696,13 +707,13 @@ const TenantLeadScreen = ({ navigation, route }) => {
                             </View>
                             <View style={styles.inputContainer}>
                                 <View style={styles.countryCode}>
-                                    <Text style={styles.flag}>🇮🇳</Text>
-                                    <Text style={styles.countryCodeText}>+91</Text>
+                                    <Text style={styles.flag}>{(COUNTRY_PHONE_CONFIG[countryCode] || COUNTRY_PHONE_CONFIG.KE).flag}</Text>
+                                    <Text style={styles.countryCodeText}>{(COUNTRY_PHONE_CONFIG[countryCode] || COUNTRY_PHONE_CONFIG.KE).dialCode}</Text>
                                     <Feather name="chevron-down" size={16} color="#9CA3AF" />
                                 </View>
                                 <TextInput
                                     style={[styles.input, styles.phoneInput]}
-                                    placeholder="98765 43210"
+                                    placeholder={(COUNTRY_PHONE_CONFIG[countryCode] || COUNTRY_PHONE_CONFIG.KE).placeholder}
                                     placeholderTextColor="#9CA3AF"
                                     value={phone}
                                     onChangeText={setPhone}
@@ -806,6 +817,80 @@ const TenantLeadScreen = ({ navigation, route }) => {
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* OTP Verification Modal */}
+            <Modal
+                visible={showOTPModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => {
+                    setShowOTPModal(false);
+                    setOtpStep('idle');
+                    setOtpError('');
+                }}
+            >
+                <View style={styles.otpOverlay}>
+                    <View style={styles.otpSheet}>
+                        {/* Handle bar */}
+                        <View style={styles.otpHandle} />
+
+                        {/* Header */}
+                        <View style={styles.otpHeader}>
+                            <Text style={styles.otpTitle}>Verify Phone Number</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setShowOTPModal(false);
+                                    setOtpStep('idle');
+                                    setOtpError('');
+                                }}
+                            >
+                                <Feather name="x" size={24} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.otpDescription}>
+                            Enter the 6-digit code sent to your WhatsApp number
+                        </Text>
+
+                        {/* OTP Input */}
+                        <View style={styles.otpInputContainer}>
+                            <OTPInput
+                                length={6}
+                                onComplete={handleVerifyOTP}
+                                disabled={otpStep === 'verifying'}
+                            />
+                        </View>
+
+                        {/* Error message */}
+                        {otpError ? (
+                            <Text style={styles.otpErrorText}>{otpError}</Text>
+                        ) : null}
+
+                        {/* Timer */}
+                        {otpTimer > 0 && (
+                            <Text style={styles.otpTimerText}>
+                                Code expires in {Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, '0')}
+                            </Text>
+                        )}
+
+                        {/* Resend button */}
+                        <TouchableOpacity
+                            style={[styles.otpResendButton, resendTimer > 0 && { opacity: 0.5 }]}
+                            onPress={handleSendOTP}
+                            disabled={resendTimer > 0 || otpStep === 'verifying'}
+                        >
+                            <Text style={styles.otpResendText}>
+                                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Verifying spinner */}
+                        {otpStep === 'verifying' && (
+                            <ActivityIndicator size="small" color="#FE9200" style={{ marginTop: 16 }} />
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -1356,6 +1441,71 @@ const styles = StyleSheet.create({
     secondaryButtonText: {
         color: '#FE9200',
         fontSize: 16,
+        fontWeight: '600',
+    },
+    // OTP Modal Styles
+    otpOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    otpSheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+        paddingTop: 12,
+    },
+    otpHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#D1D5DB',
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    otpHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    otpTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    otpDescription: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    otpInputContainer: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    otpErrorText: {
+        color: '#EF4444',
+        fontSize: 13,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    otpTimerText: {
+        color: '#6B7280',
+        fontSize: 13,
+        textAlign: 'center',
+        marginBottom: 12,
+    },
+    otpResendButton: {
+        alignSelf: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+    },
+    otpResendText: {
+        color: '#FE9200',
+        fontSize: 14,
         fontWeight: '600',
     },
 });

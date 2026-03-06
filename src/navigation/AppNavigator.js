@@ -43,6 +43,8 @@ import LeadSearchScreen from '../screens/agent/LeadSearchScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import LanguageScreen from '../screens/settings/LanguageScreen';
+import ChangePasswordScreen from '../screens/settings/ChangePasswordScreen';
+import PrivacyPolicyScreen from '../screens/settings/PrivacyPolicyScreen';
 
 // Support Screens
 import SupportScreen from '../screens/support/SupportScreen';
@@ -79,10 +81,10 @@ const AgentTabBar = ({ state, descriptors, navigation }) => {
     let unsub;
     const load = async () => {
       const result = await getUnreadNotificationCount(user.id);
-      if (result.success) setUnreadCount(result.data || 0);
+      if (result.success) setUnreadCount(result.count || 0);
       unsub = subscribeToNotifications(user.id, () => {
         getUnreadNotificationCount(user.id).then(r => {
-          if (r.success) setUnreadCount(r.data || 0);
+          if (r.success) setUnreadCount(r.count || 0);
         });
       });
     };
@@ -415,9 +417,24 @@ const TenantMainStack = () => {
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="ResetPassword"
         component={ResetPasswordScreen}
         options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>
   );
@@ -572,6 +589,16 @@ const AgentMainStack = () => {
         name="ResetPassword"
         component={ResetPasswordScreen}
         options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>
   );

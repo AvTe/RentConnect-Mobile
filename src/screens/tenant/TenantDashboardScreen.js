@@ -18,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { getTenantLeads } from '../../lib/leadService';
+import { getUnreadNotificationCount, subscribeToNotifications } from '../../lib/notificationService';
 import YoombaaLogo from '../../../assets/yoombaa logo svg.svg';
 
 const { width } = Dimensions.get('window');
@@ -53,6 +54,7 @@ const TenantDashboardScreen = ({ navigation }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [stats, setStats] = useState({ active: 0, views: 0, replies: 0 });
     const [recentRequests, setRecentRequests] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     // Animation refs
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -116,6 +118,23 @@ const TenantDashboardScreen = ({ navigation }) => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Notification count + real-time subscription
+    useEffect(() => {
+        if (!user?.id) return;
+        let unsub;
+        const loadCount = async () => {
+            const result = await getUnreadNotificationCount(user.id);
+            if (result.success) setUnreadCount(result.count || 0);
+        };
+        loadCount();
+        unsub = subscribeToNotifications(user.id, () => {
+            getUnreadNotificationCount(user.id).then(r => {
+                if (r.success) setUnreadCount(r.count || 0);
+            });
+        });
+        return () => { if (unsub) unsub(); };
+    }, [user?.id]);
 
     // Auto-scroll carousel
     useEffect(() => {
@@ -197,9 +216,19 @@ const TenantDashboardScreen = ({ navigation }) => {
             <View style={styles.header}>
                 <YoombaaLogo width={120} height={40} />
                 <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.iconButton}>
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={() => navigation.navigate('Notifications')}
+                        activeOpacity={0.7}
+                    >
                         <Feather name="bell" size={22} color={COLORS.text} />
-                        <View style={styles.notificationDot} />
+                        {unreadCount > 0 && (
+                            <View style={styles.notificationBadge}>
+                                <Text style={styles.notificationBadgeText}>
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.profileButton}
@@ -286,9 +315,6 @@ const TenantDashboardScreen = ({ navigation }) => {
                 {/* Stats Cards - Improved */}
                 <Animated.View style={[styles.statsContainer, { opacity: fadeAnim }]}>
                     <Animated.View style={[styles.statCard, { transform: [{ scale: scaleAnim1 }] }]}>
-                        <View style={[styles.statIconWrapper, { backgroundColor: COLORS.primaryLight }]}>
-                            <Feather name="home" size={18} color={COLORS.primary} />
-                        </View>
                         <Text style={styles.statValue}>{stats.active}</Text>
                         <Text style={styles.statLabel}>ACTIVE</Text>
                         <View style={styles.statMeta}>
@@ -298,9 +324,6 @@ const TenantDashboardScreen = ({ navigation }) => {
                     </Animated.View>
 
                     <Animated.View style={[styles.statCard, { transform: [{ scale: scaleAnim2 }] }]}>
-                        <View style={[styles.statIconWrapper, { backgroundColor: '#EDE9FE' }]}>
-                            <Feather name="eye" size={18} color={COLORS.purple} />
-                        </View>
                         <Text style={styles.statValue}>{stats.views}</Text>
                         <Text style={styles.statLabel}>VIEWS</Text>
                         <View style={styles.statMeta}>
@@ -310,9 +333,6 @@ const TenantDashboardScreen = ({ navigation }) => {
                     </Animated.View>
 
                     <Animated.View style={[styles.statCard, { transform: [{ scale: scaleAnim3 }] }]}>
-                        <View style={[styles.statIconWrapper, { backgroundColor: '#FEF3C7' }]}>
-                            <Feather name="mail" size={18} color={COLORS.amber} />
-                        </View>
                         <Text style={styles.statValue}>{stats.replies}</Text>
                         <Text style={styles.statLabel}>REPLIES</Text>
                         <View style={styles.statMeta}>
@@ -468,16 +488,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         position: 'relative',
     },
-    notificationDot: {
+    notificationBadge: {
         position: 'absolute',
-        top: 8,
-        right: 10,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        top: 4,
+        right: 4,
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
         backgroundColor: COLORS.error,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
         borderWidth: 2,
         borderColor: COLORS.card,
+    },
+    notificationBadgeText: {
+        fontSize: 10,
+        fontFamily: 'DMSans_700Bold',
+        color: '#FFFFFF',
+        lineHeight: 12,
     },
     profileButton: {
         borderRadius: 12,
@@ -531,12 +560,12 @@ const styles = StyleSheet.create({
     promoTagText: {
         color: '#FFFFFF',
         fontSize: 10,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         letterSpacing: 0.5,
     },
     bannerTitle: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: '#FFFFFF',
         marginBottom: 4,
     },
@@ -588,14 +617,14 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 28,
-        fontWeight: '800',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
         lineHeight: 32,
     },
     statLabel: {
         fontSize: 10,
         color: COLORS.textSecondary,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         letterSpacing: 0.5,
         marginTop: 2,
         marginBottom: 6,
@@ -608,7 +637,7 @@ const styles = StyleSheet.create({
     statMetaText: {
         fontSize: 9,
         color: COLORS.primary,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
     },
     // Browse Agents CTA
     browseAgentsCta: {
@@ -650,7 +679,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     viewAllButton: {
@@ -661,7 +690,7 @@ const styles = StyleSheet.create({
     viewAllText: {
         fontSize: 13,
         color: COLORS.primary,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
     },
     // Empty State
     emptyCard: {
@@ -684,7 +713,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
     emptySubtext: {
@@ -716,7 +745,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 10,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         letterSpacing: 0.5,
     },
     postedDateWrapper: {
@@ -740,7 +769,7 @@ const styles = StyleSheet.create({
     },
     requestTitle: {
         fontSize: 16,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
         marginBottom: 6,
     },
@@ -759,18 +788,18 @@ const styles = StyleSheet.create({
     budgetLabel: {
         fontSize: 9,
         color: COLORS.textLight,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         letterSpacing: 0.5,
     },
     budgetCurrency: {
         fontSize: 12,
         color: COLORS.primary,
-        fontWeight: '500',
+        fontFamily: 'DMSans_500Medium',
     },
     budgetAmount: {
         fontSize: 20,
         color: COLORS.primary,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
     },
     budgetPeriod: {
         fontSize: 11,
@@ -796,12 +825,12 @@ const styles = StyleSheet.create({
     metricLabel: {
         fontSize: 9,
         color: COLORS.textLight,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         letterSpacing: 0.3,
     },
     metricValue: {
         fontSize: 14,
-        fontWeight: '700',
+        fontFamily: 'DMSans_700Bold',
         color: COLORS.text,
     },
     metricDivider: {
@@ -817,7 +846,7 @@ const styles = StyleSheet.create({
     },
     manageBtnText: {
         fontSize: 13,
-        fontWeight: '600',
+        fontFamily: 'DMSans_600SemiBold',
         color: COLORS.text,
     },
 });
