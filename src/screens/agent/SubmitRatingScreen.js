@@ -13,19 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { submitAgentRating, RATING_CATEGORIES } from '../../lib/ratingService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    starFilled: '#F59E0B',
-    starEmpty: '#E5E7EB',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const SubmitRatingScreen = ({ navigation, route }) => {
     const { agentId, agentName, leadId } = route.params;
@@ -210,7 +198,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     scrollView: { flex: 1 },
@@ -235,13 +223,13 @@ const styles = StyleSheet.create({
     },
     agentName: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 4,
     },
     agentSubtext: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     ratingSection: {
@@ -249,7 +237,7 @@ const styles = StyleSheet.create({
     },
     sectionLabel: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 14,
     },
@@ -267,7 +255,7 @@ const styles = StyleSheet.create({
     },
     ratingLabel: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textLight,
         marginTop: 10,
     },
@@ -289,7 +277,7 @@ const styles = StyleSheet.create({
     },
     categoryLabel: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     reviewInput: {
@@ -300,13 +288,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
         minHeight: 100,
     },
     charCount: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
         textAlign: 'right',
         marginTop: 6,
@@ -325,7 +313,7 @@ const styles = StyleSheet.create({
     },
     submitBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
 });

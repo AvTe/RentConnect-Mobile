@@ -18,23 +18,7 @@ import {
     markVoucherViewed,
     getVoucherStats,
 } from '../../lib/voucherService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    purple: '#8B5CF6',
-    purpleLight: '#EDE9FE',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const FILTER_TABS = ['All', 'Active', 'Redeemed', 'Expired'];
 
@@ -74,6 +58,14 @@ const VouchersScreen = ({ navigation }) => {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadData();
+        });
+        return unsubscribe;
+    }, [navigation, loadData]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -280,7 +272,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     scrollView: { flex: 1 },
@@ -314,12 +306,12 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     statLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -341,7 +333,7 @@ const styles = StyleSheet.create({
     },
     filterTabText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     filterTabTextActive: {
@@ -371,13 +363,13 @@ const styles = StyleSheet.create({
     },
     voucherTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 2,
     },
     voucherCode: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
         marginBottom: 4,
     },
@@ -387,7 +379,7 @@ const styles = StyleSheet.create({
     },
     voucherDate: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
     },
     voucherRight: {
@@ -396,7 +388,7 @@ const styles = StyleSheet.create({
     },
     voucherValue: {
         fontSize: 15,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     statusBadge: {
         paddingHorizontal: 8,
@@ -406,7 +398,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 10,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     redeemBtn: {
         backgroundColor: COLORS.primary,
@@ -417,7 +409,7 @@ const styles = StyleSheet.create({
     },
     redeemBtnText: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     emptyContainer: {
@@ -435,13 +427,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
     emptySubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         paddingHorizontal: 32,

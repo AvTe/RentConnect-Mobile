@@ -8,6 +8,7 @@ import {
     Switch,
     Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +16,7 @@ import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage, availableLanguages } from '../../context/LanguageContext';
 import { updateUser } from '../../lib/database';
+import { FONTS } from '../../constants/theme';
 
 const AgentSettingsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -25,22 +27,29 @@ const AgentSettingsScreen = ({ navigation }) => {
     const [pushNotifications, setPushNotifications] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(false);
 
-    // Load persisted notification preferences from user profile
+    // Load persisted notification preferences
     useEffect(() => {
-        if (userData) {
-            setPushNotifications(userData.push_notifications !== false); // default true
-            setEmailAlerts(userData.email_alerts === true); // default false
-        }
-    }, [userData]);
+        const loadPrefs = async () => {
+            try {
+                const push = await AsyncStorage.getItem('pref_push_notifications');
+                const email = await AsyncStorage.getItem('pref_email_alerts');
+                if (push !== null) setPushNotifications(push === 'true');
+                if (email !== null) setEmailAlerts(email === 'true');
+            } catch {
+                // fallback to defaults
+            }
+        };
+        loadPrefs();
+    }, []);
 
     const handleTogglePush = useCallback(async (value) => {
         setPushNotifications(value);
-        // push_notifications column may not exist yet — keep as local preference
+        try { await AsyncStorage.setItem('pref_push_notifications', String(value)); } catch {}
     }, []);
 
     const handleToggleEmail = useCallback(async (value) => {
         setEmailAlerts(value);
-        // email_alerts column may not exist yet — keep as local preference
+        try { await AsyncStorage.setItem('pref_email_alerts', String(value)); } catch {}
     }, []);
 
     const handleSignOut = () => {
@@ -273,7 +282,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     headerPlaceholder: {
         width: 40,
@@ -302,23 +311,23 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     profileInfo: {
         marginLeft: 14,
     },
     profileName: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     profileRole: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginTop: 2,
     },
     sectionLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         letterSpacing: 0.5,
         marginBottom: 10,
         marginTop: 8,
@@ -348,16 +357,16 @@ const styles = StyleSheet.create({
     },
     settingTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     settingSubtitle: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginTop: 2,
     },
     settingValue: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginRight: 8,
     },
     divider: {
@@ -373,18 +382,18 @@ const styles = StyleSheet.create({
     },
     signOutText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     versionText: {
         textAlign: 'center',
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginTop: 20,
     },
     versionNumber: {
         textAlign: 'center',
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginTop: 4,
     },
 });

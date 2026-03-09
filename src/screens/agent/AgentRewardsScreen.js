@@ -16,24 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { getReferralCode, getReferralStats } from '../../lib/database';
 import { getAgentVouchers, getVoucherStats, redeemVoucher } from '../../lib/voucherService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    primaryDark: '#E58300',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    error: '#EF4444',
-    purple: '#8B5CF6',
-    purpleLight: '#EDE9FE',
-    blue: '#3B82F6',
-    blueLight: '#DBEAFE',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const TAB_OPTIONS = ['Referrals', 'Vouchers'];
 const VOUCHER_FILTERS = ['All', 'Active', 'Redeemed', 'Expired'];
@@ -87,6 +70,14 @@ const AgentRewardsScreen = ({ navigation }) => {
     }, [user?.id]);
 
     useEffect(() => { loadData(); }, [loadData]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadData();
+        });
+        return unsubscribe;
+    }, [navigation, loadData]);
 
     const onRefresh = () => { setRefreshing(true); loadData(); };
 
@@ -355,7 +346,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20, paddingVertical: 14,
         backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border,
     },
-    headerTitle: { fontSize: 22, fontFamily: 'DMSans_700Bold', color: COLORS.text },
+    headerTitle: { fontSize: 22, fontFamily: FONTS.bold, color: COLORS.text },
     // Tabs
     tabRow: {
         flexDirection: 'row', backgroundColor: COLORS.card,
@@ -366,8 +357,8 @@ const styles = StyleSheet.create({
         paddingVertical: 14, gap: 6, borderBottomWidth: 2, borderBottomColor: 'transparent',
     },
     tabActive: { borderBottomColor: COLORS.primary },
-    tabText: { fontSize: 14, fontFamily: 'DMSans_500Medium', color: COLORS.textSecondary },
-    tabTextActive: { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' },
+    tabText: { fontSize: 14, fontFamily: FONTS.medium, color: COLORS.textSecondary },
+    tabTextActive: { color: COLORS.primary, fontFamily: FONTS.semiBold },
     scrollView: { flex: 1 },
     scrollContent: { padding: 20 },
     // Referral Code Card
@@ -380,15 +371,15 @@ const styles = StyleSheet.create({
         width: 48, height: 48, borderRadius: 14, backgroundColor: COLORS.primaryLight,
         justifyContent: 'center', alignItems: 'center', marginRight: 14,
     },
-    referralCodeTitle: { fontSize: 17, fontFamily: 'DMSans_700Bold', color: COLORS.text },
-    referralCodeSubtitle: { fontSize: 13, fontFamily: 'DMSans_400Regular', color: COLORS.textSecondary, marginTop: 2 },
+    referralCodeTitle: { fontSize: 17, fontFamily: FONTS.bold, color: COLORS.text },
+    referralCodeSubtitle: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textSecondary, marginTop: 2 },
     codeContainer: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         backgroundColor: COLORS.background, borderRadius: 14,
         borderWidth: 1.5, borderColor: COLORS.primary, borderStyle: 'dashed',
         paddingHorizontal: 20, paddingVertical: 16, marginBottom: 16,
     },
-    codeText: { fontSize: 24, fontFamily: 'DMSans_700Bold', color: COLORS.primary, letterSpacing: 2 },
+    codeText: { fontSize: 24, fontFamily: FONTS.bold, color: COLORS.primary, letterSpacing: 2 },
     copyButton: {
         width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.primaryLight,
         justifyContent: 'center', alignItems: 'center',
@@ -398,14 +389,14 @@ const styles = StyleSheet.create({
         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 14, gap: 8,
     },
-    shareButtonText: { fontSize: 15, fontFamily: 'DMSans_600SemiBold', color: '#FFFFFF' },
+    shareButtonText: { fontSize: 15, fontFamily: FONTS.semiBold, color: '#FFFFFF' },
     whatsappButton: {
         width: 52, height: 52, borderRadius: 14, backgroundColor: '#E6F9ED',
         justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#25D366',
     },
     // Stats
     sectionLabel: {
-        fontSize: 12, fontFamily: 'DMSans_600SemiBold', color: COLORS.textSecondary,
+        fontSize: 12, fontFamily: FONTS.semiBold, color: COLORS.textSecondary,
         letterSpacing: 0.5, marginBottom: 12,
     },
     statsScroll: { marginHorizontal: -20, marginBottom: 24 },
@@ -415,24 +406,24 @@ const styles = StyleSheet.create({
         width: 130, alignItems: 'flex-start', borderWidth: 1, borderColor: COLORS.border,
     },
     statIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-    statValue: { fontSize: 26, fontFamily: 'DMSans_700Bold', color: COLORS.text },
-    statLabel: { fontSize: 10, fontFamily: 'DMSans_600SemiBold', color: COLORS.textSecondary, letterSpacing: 0.3, marginTop: 4 },
+    statValue: { fontSize: 26, fontFamily: FONTS.bold, color: COLORS.text },
+    statLabel: { fontSize: 10, fontFamily: FONTS.semiBold, color: COLORS.textSecondary, letterSpacing: 0.3, marginTop: 4 },
     // How It Works
     howItWorksCard: {
         backgroundColor: COLORS.card, borderRadius: 20, padding: 20,
         borderWidth: 1, borderColor: COLORS.border,
     },
     howItWorksHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
-    howItWorksTitle: { fontSize: 16, fontFamily: 'DMSans_700Bold', color: COLORS.text },
+    howItWorksTitle: { fontSize: 16, fontFamily: FONTS.bold, color: COLORS.text },
     stepItem: { flexDirection: 'row', marginBottom: 18 },
     stepNumber: {
         width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary,
         justifyContent: 'center', alignItems: 'center', marginRight: 14,
     },
-    stepNumberText: { fontSize: 14, fontFamily: 'DMSans_700Bold', color: '#FFFFFF' },
+    stepNumberText: { fontSize: 14, fontFamily: FONTS.bold, color: '#FFFFFF' },
     stepContent: { flex: 1 },
-    stepTitle: { fontSize: 15, fontFamily: 'DMSans_600SemiBold', color: COLORS.text, marginBottom: 3 },
-    stepDescription: { fontSize: 13, fontFamily: 'DMSans_400Regular', color: COLORS.textSecondary, lineHeight: 18 },
+    stepTitle: { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.text, marginBottom: 3 },
+    stepDescription: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textSecondary, lineHeight: 18 },
     // Voucher Filter
     filterRow: { flexDirection: 'row', marginBottom: 20, gap: 8 },
     filterTab: {
@@ -440,7 +431,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
     },
     filterTabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-    filterTabText: { fontSize: 13, fontFamily: 'DMSans_500Medium', color: COLORS.textSecondary },
+    filterTabText: { fontSize: 13, fontFamily: FONTS.medium, color: COLORS.textSecondary },
     filterTabTextActive: { color: '#FFFFFF' },
     // Voucher Card
     voucherCard: {
@@ -450,21 +441,21 @@ const styles = StyleSheet.create({
     voucherHeader: { flexDirection: 'row', alignItems: 'center' },
     voucherBrand: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
     voucherInfo: { flex: 1 },
-    voucherName: { fontSize: 15, fontFamily: 'DMSans_600SemiBold', color: COLORS.text },
-    voucherValue: { fontSize: 14, fontFamily: 'DMSans_700Bold', color: COLORS.primary, marginTop: 2 },
+    voucherName: { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.text },
+    voucherValue: { fontSize: 14, fontFamily: FONTS.bold, color: COLORS.primary, marginTop: 2 },
     voucherStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    voucherStatusText: { fontSize: 10, fontFamily: 'DMSans_700Bold', letterSpacing: 0.5 },
+    voucherStatusText: { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.5 },
     voucherCodeRow: {
         marginTop: 12, backgroundColor: COLORS.background, borderRadius: 10,
         paddingHorizontal: 14, paddingVertical: 10,
     },
-    voucherCode: { fontSize: 14, fontFamily: 'DMSans_600SemiBold', color: COLORS.text, letterSpacing: 1 },
+    voucherCode: { fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.text, letterSpacing: 1 },
     redeemButton: {
         backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 12,
         alignItems: 'center', marginTop: 12,
     },
-    redeemButtonText: { fontSize: 14, fontFamily: 'DMSans_600SemiBold', color: '#FFFFFF' },
-    voucherExpiry: { fontSize: 12, fontFamily: 'DMSans_400Regular', color: COLORS.textSecondary, marginTop: 8 },
+    redeemButtonText: { fontSize: 14, fontFamily: FONTS.semiBold, color: '#FFFFFF' },
+    voucherExpiry: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.textSecondary, marginTop: 8 },
     // Empty State
     emptyState: {
         alignItems: 'center', paddingVertical: 40, backgroundColor: COLORS.card,
@@ -474,13 +465,13 @@ const styles = StyleSheet.create({
         width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.background,
         justifyContent: 'center', alignItems: 'center', marginBottom: 16,
     },
-    emptyTitle: { fontSize: 18, fontFamily: 'DMSans_700Bold', color: COLORS.text, marginBottom: 8 },
+    emptyTitle: { fontSize: 18, fontFamily: FONTS.bold, color: COLORS.text, marginBottom: 8 },
     emptyText: {
-        fontSize: 14, fontFamily: 'DMSans_400Regular', color: COLORS.textSecondary,
+        fontSize: 14, fontFamily: FONTS.regular, color: COLORS.textSecondary,
         textAlign: 'center', lineHeight: 20, marginBottom: 20,
     },
     premiumButton: { backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
-    premiumButtonText: { fontSize: 15, fontFamily: 'DMSans_600SemiBold', color: '#FFFFFF' },
+    premiumButtonText: { fontSize: 15, fontFamily: FONTS.semiBold, color: '#FFFFFF' },
 });
 
 export default AgentRewardsScreen;

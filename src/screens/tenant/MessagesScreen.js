@@ -7,18 +7,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    purple: '#8B5CF6',
-    purpleLight: '#EDE9FE',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const MessagesScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -86,7 +75,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     content: {
@@ -107,13 +96,13 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 12,
     },
     description: {
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
@@ -145,13 +134,13 @@ const styles = StyleSheet.create({
     },
     infoTitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 4,
     },
     infoText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 19,
     },
@@ -166,7 +155,7 @@ const styles = StyleSheet.create({
     },
     ctaBtnText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
 });

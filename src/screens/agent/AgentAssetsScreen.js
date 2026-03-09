@@ -29,6 +29,7 @@ import { useToast } from '../../context/ToastContext';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
 import { updateAgentStorageUsage } from '../../lib/agentService';
+import { COLORS, FONTS } from '../../constants/theme';
 
 const STORAGE_BUCKET = 'agent-assets';
 
@@ -105,24 +106,6 @@ const SafeImage = ({ uri, style, fallbackIcon, fallbackColor, fallbackBg, resize
             )}
         </View>
     );
-};
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    blue: '#3B82F6',
-    blueLight: '#DBEAFE',
-    purple: '#8B5CF6',
-    purpleLight: '#EDE9FE',
 };
 
 const AgentAssetsScreen = ({ navigation }) => {
@@ -1587,7 +1570,7 @@ const AgentAssetsScreen = ({ navigation }) => {
 
                         <View style={styles.formModalBody}>
                             <Text style={styles.moveFileLabel}>
-                                Moving: <Text style={{ fontFamily: 'DMSans_600SemiBold' }}>{movingAsset.file_name}</Text>
+                                Moving: <Text style={{ fontFamily: FONTS.semiBold }}>{movingAsset.file_name}</Text>
                             </Text>
 
                             <ScrollView style={styles.moveFileList} bounces={false}>
@@ -1606,7 +1589,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                                     />
                                     <Text style={[
                                         styles.moveFileName,
-                                        movingToFolderId === null && { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' },
+                                        movingToFolderId === null && { color: COLORS.primary, fontFamily: FONTS.semiBold },
                                     ]}>Uncategorized</Text>
                                     {movingToFolderId === null && (
                                         <Feather name="check" size={18} color={COLORS.primary} />
@@ -1631,7 +1614,7 @@ const AgentAssetsScreen = ({ navigation }) => {
                                         <View style={{ flex: 1 }}>
                                             <Text style={[
                                                 styles.moveFileName,
-                                                movingToFolderId === folder.id && { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' },
+                                                movingToFolderId === folder.id && { color: COLORS.primary, fontFamily: FONTS.semiBold },
                                             ]}>{folder.name}</Text>
                                             {folder.location ? (
                                                 <Text style={styles.moveFolderLocation}>{folder.location}</Text>
@@ -1896,7 +1879,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Header
@@ -1918,7 +1901,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     headerRight: {
@@ -1966,18 +1949,18 @@ const styles = StyleSheet.create({
     },
     storageTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     storageSubtitle: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     upgradeText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     storageUsageRow: {
@@ -1987,12 +1970,12 @@ const styles = StyleSheet.create({
     },
     storageUsed: {
         fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     storageLimit: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginLeft: 6,
     },
@@ -2025,12 +2008,12 @@ const styles = StyleSheet.create({
     },
     fileTypeCount: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     fileTypeLabel: {
         fontSize: 10,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
@@ -2056,7 +2039,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 10,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     viewToggle: {
@@ -2092,7 +2075,7 @@ const styles = StyleSheet.create({
     },
     tabText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     tabTextActive: {
@@ -2110,7 +2093,7 @@ const styles = StyleSheet.create({
     },
     tabBadgeText: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
     },
     tabBadgeTextActive: {
@@ -2125,13 +2108,13 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 12,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
     fileCount: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Properties Grid
@@ -2173,7 +2156,7 @@ const styles = StyleSheet.create({
     },
     propertyName: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         flex: 1,
     },
@@ -2185,12 +2168,12 @@ const styles = StyleSheet.create({
     },
     propertyLocation: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     propertyFileCount: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
         marginTop: 2,
     },
@@ -2217,7 +2200,7 @@ const styles = StyleSheet.create({
     },
     gridFileName: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
         marginTop: 4,
         textAlign: 'center',
@@ -2255,12 +2238,12 @@ const styles = StyleSheet.create({
     },
     fileName: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     fileMeta: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -2275,13 +2258,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginTop: 12,
     },
     emptyText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -2347,7 +2330,7 @@ const styles = StyleSheet.create({
     },
     previewLoadingText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.7)',
         marginTop: 12,
     },
@@ -2358,14 +2341,14 @@ const styles = StyleSheet.create({
     },
     previewErrorText: {
         fontSize: 16,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: 'rgba(255,255,255,0.7)',
         marginTop: 16,
         textAlign: 'center',
     },
     previewErrorSub: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.4)',
         marginTop: 8,
         textAlign: 'center',
@@ -2377,13 +2360,13 @@ const styles = StyleSheet.create({
     },
     previewFileName: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
         textAlign: 'center',
     },
     previewFileMeta: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.7)',
         marginTop: 4,
     },
@@ -2408,7 +2391,7 @@ const styles = StyleSheet.create({
     },
     previewActionText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: '#FFFFFF',
     },
     // Folder Modal
@@ -2428,7 +2411,7 @@ const styles = StyleSheet.create({
     },
     folderModalTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     folderContent: {
@@ -2467,7 +2450,7 @@ const styles = StyleSheet.create({
     },
     menuText: {
         fontSize: 16,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     // Folder shared badge
@@ -2492,12 +2475,12 @@ const styles = StyleSheet.create({
     },
     folderInfoText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     folderInfoDesc: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -2517,7 +2500,7 @@ const styles = StyleSheet.create({
     },
     uploadToFolderText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     // New Folder button in section header
@@ -2532,7 +2515,7 @@ const styles = StyleSheet.create({
     },
     newFolderBtnText: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     // Empty folder card (create first folder CTA)
@@ -2549,13 +2532,13 @@ const styles = StyleSheet.create({
     },
     emptyFolderCardText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginTop: 8,
     },
     emptyFolderCardSub: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -2582,7 +2565,7 @@ const styles = StyleSheet.create({
     },
     formModalTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     formModalBody: {
@@ -2591,7 +2574,7 @@ const styles = StyleSheet.create({
     },
     formLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
         marginTop: 12,
@@ -2603,7 +2586,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
         backgroundColor: COLORS.background,
     },
@@ -2629,7 +2612,7 @@ const styles = StyleSheet.create({
     },
     formCancelText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     formSaveBtn: {
@@ -2640,13 +2623,13 @@ const styles = StyleSheet.create({
     },
     formSaveText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     // Move file modal
     moveFileLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginBottom: 10,
     },
@@ -2668,12 +2651,12 @@ const styles = StyleSheet.create({
     moveFileName: {
         flex: 1,
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     moveFolderLocation: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 1,
     },

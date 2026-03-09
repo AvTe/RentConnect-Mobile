@@ -13,20 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '../../context/ToastContext';
 import { getAgentById } from '../../lib/agentService';
 import { getAgentRatingSummary, getAgentRatings } from '../../lib/ratingService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    starFilled: '#F59E0B',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const AgentProfileViewScreen = ({ navigation, route }) => {
     const { agentId } = route.params;
@@ -61,7 +48,7 @@ const AgentProfileViewScreen = ({ navigation, route }) => {
 
     const renderStars = (rating, size = 14) => {
         const stars = [];
-        const rounded = Math.round(rating || 0);
+        const rounded = Math.floor(rating || 0);
         for (let i = 1; i <= 5; i++) {
             stars.push(
                 <Feather
@@ -130,7 +117,7 @@ const AgentProfileViewScreen = ({ navigation, route }) => {
                 <View style={styles.profileCard}>
                     <View style={styles.avatarLarge}>
                         {agent.avatar ? (
-                            <Image source={{ uri: agent.avatar }} style={styles.avatarLargeImg} />
+                            <Image source={{ uri: agent.avatar }} style={styles.avatarLargeImg} onError={() => {}} />
                         ) : (
                             <Feather name="user" size={32} color={COLORS.primary} />
                         )}
@@ -255,7 +242,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     centerContainer: {
@@ -266,7 +253,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     scrollView: { flex: 1 },
@@ -297,13 +284,13 @@ const styles = StyleSheet.create({
     },
     profileName: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 4,
     },
     agencyName: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
         marginBottom: 6,
     },
@@ -315,7 +302,7 @@ const styles = StyleSheet.create({
     },
     locationBadgeText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     verifiedBadge: {
@@ -329,7 +316,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.success,
     },
     statsRow: {
@@ -343,12 +330,12 @@ const styles = StyleSheet.create({
     },
     statNum: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     statLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -367,18 +354,18 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 12,
     },
     seeAllText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
     },
     bioText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 22,
     },
@@ -397,12 +384,12 @@ const styles = StyleSheet.create({
     },
     detailText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     noReviews: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         paddingVertical: 20,
@@ -430,7 +417,7 @@ const styles = StyleSheet.create({
     },
     reviewerName: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         flex: 1,
     },
@@ -440,7 +427,7 @@ const styles = StyleSheet.create({
     },
     reviewText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 20,
         marginTop: 10,

@@ -26,28 +26,13 @@ import {
     unlockLead,
     getLead,
     hasAgentUnlockedLead,
+    incrementLeadViews,
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
 import { checkAgentLeadConnection, updateLeadOutcome, recordLeadContact } from '../../lib/leadConnectionService';
-import { getWalletBalance } from '../../lib/database';
+import { getWalletBalance, subscribeToWalletChanges } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    warningLight: '#FEF3C7',
-    error: '#EF4444',
-    blue: '#3B82F6',
-    blueLight: '#DBEAFE',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const LeadDetailScreen = ({ route, navigation }) => {
     const { leadId } = route.params || {};
@@ -112,6 +97,9 @@ const LeadDetailScreen = ({ route, navigation }) => {
             if (balanceResult.success) {
                 setCreditBalance(balanceResult.balance);
             }
+
+            // Track lead view (once per agent per lead)
+            incrementLeadViews(leadId, user.id);
         } catch (error) {
             console.error('Error fetching lead:', error);
             toast.error('Failed to load lead details');
@@ -123,6 +111,25 @@ const LeadDetailScreen = ({ route, navigation }) => {
     useEffect(() => {
         fetchLeadDetails();
     }, [fetchLeadDetails]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchLeadDetails();
+        });
+        return unsubscribe;
+    }, [navigation, fetchLeadDetails]);
+
+    // Real-time wallet balance subscription
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsubscribe = subscribeToWalletChanges(user.id, (newBalance) => {
+            setCreditBalance(newBalance);
+        });
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user?.id]);
 
     const handleUnlock = async (isExclusive = false) => {
         if (!lead) return;
@@ -724,7 +731,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     errorContainer: {
@@ -733,7 +740,7 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginTop: 16,
     },
@@ -746,7 +753,7 @@ const styles = StyleSheet.create({
     },
     backBtnText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     // Header
@@ -768,7 +775,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     shareButton: {
@@ -800,12 +807,12 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 0.5,
     },
     leadId: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     // Main Card
@@ -819,13 +826,13 @@ const styles = StyleSheet.create({
     },
     lookingFor: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         marginBottom: 4,
     },
     propertyType: {
         fontSize: 24,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 12,
     },
@@ -836,7 +843,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     divider: {
@@ -854,14 +861,14 @@ const styles = StyleSheet.create({
     },
     detailLabel: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
         marginBottom: 4,
     },
     detailValue: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     // Slots Card
@@ -881,7 +888,7 @@ const styles = StyleSheet.create({
     },
     slotsTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     slotsBadge: {
@@ -891,7 +898,7 @@ const styles = StyleSheet.create({
     },
     slotsBadgeText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 0.5,
     },
     slotsRow: {
@@ -918,7 +925,7 @@ const styles = StyleSheet.create({
     },
     slotsPricing: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
     },
@@ -948,7 +955,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     tenantInfo: {
@@ -957,7 +964,7 @@ const styles = StyleSheet.create({
     },
     tenantName: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     verifiedRow: {
@@ -975,7 +982,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.success,
     },
     contactInfo: {
@@ -991,7 +998,7 @@ const styles = StyleSheet.create({
     },
     contactText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     lockedInfo: {
@@ -1005,7 +1012,7 @@ const styles = StyleSheet.create({
     },
     lockedText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     // Notes Card
@@ -1019,13 +1026,13 @@ const styles = StyleSheet.create({
     },
     notesTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 8,
     },
     notesText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 20,
     },
@@ -1043,7 +1050,7 @@ const styles = StyleSheet.create({
     },
     reportBadLeadText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: '#EF4444',
     },
     // Bottom Bar
@@ -1076,7 +1083,7 @@ const styles = StyleSheet.create({
     },
     callButtonText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     whatsappButton: {
@@ -1091,7 +1098,7 @@ const styles = StyleSheet.create({
     },
     whatsappButtonText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     disabledBar: {
@@ -1100,7 +1107,7 @@ const styles = StyleSheet.create({
     },
     disabledText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     unlockActions: {
@@ -1119,7 +1126,7 @@ const styles = StyleSheet.create({
     },
     unlockButtonText: {
         fontSize: 15,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     exclusiveButton: {
@@ -1136,7 +1143,7 @@ const styles = StyleSheet.create({
     },
     exclusiveButtonText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     // Lead Outcome Tracking
@@ -1150,13 +1157,13 @@ const styles = StyleSheet.create({
     },
     outcomeTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 4,
     },
     outcomeDesc: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginBottom: 12,
     },
@@ -1178,7 +1185,7 @@ const styles = StyleSheet.create({
     },
     outcomeConvertedText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.success,
     },
     outcomeLostBtn: {
@@ -1195,7 +1202,7 @@ const styles = StyleSheet.create({
     },
     outcomeLostText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.error,
     },
     outcomeBadge: {
@@ -1214,7 +1221,7 @@ const styles = StyleSheet.create({
     },
     outcomeBadgeText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     // Share Preview Card (rendered off-screen, captured by ViewShot)
     shareCardWrapper: {
@@ -1251,18 +1258,18 @@ const styles = StyleSheet.create({
     },
     shareCardLogoText: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     shareCardBrand: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         letterSpacing: 1.5,
     },
     shareCardSubbrand: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     shareCardBody: {
@@ -1272,13 +1279,13 @@ const styles = StyleSheet.create({
     },
     shareCardLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         marginBottom: 2,
     },
     shareCardPropertyType: {
         fontSize: 26,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 10,
     },
@@ -1297,7 +1304,7 @@ const styles = StyleSheet.create({
     },
     shareCardLocation: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     shareCardPills: {
@@ -1318,7 +1325,7 @@ const styles = StyleSheet.create({
     },
     shareCardPillText: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     shareCardTenantRow: {
@@ -1340,12 +1347,12 @@ const styles = StyleSheet.create({
     },
     shareCardAvatarText: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     shareCardTenantName: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     shareCardVerified: {
@@ -1359,7 +1366,7 @@ const styles = StyleSheet.create({
     },
     shareCardVerifiedText: {
         fontSize: 10,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.success,
     },
     shareCardLinkRow: {
@@ -1371,7 +1378,7 @@ const styles = StyleSheet.create({
     },
     shareCardLinkText: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
         flex: 1,
     },
@@ -1382,7 +1389,7 @@ const styles = StyleSheet.create({
     },
     shareCardCTA: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         letterSpacing: 0.5,
     },

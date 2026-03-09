@@ -16,21 +16,7 @@ import {
     getAgentRatings,
     getAgentRatingSummary,
 } from '../../lib/ratingService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    warning: '#F59E0B',
-    starFilled: '#F59E0B',
-    starEmpty: '#E5E7EB',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const AgentRatingsScreen = ({ navigation, route }) => {
     const { agentId: paramAgentId } = route.params || {};
@@ -80,6 +66,14 @@ const AgentRatingsScreen = ({ navigation, route }) => {
         loadData(true);
     }, [agentId]);
 
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadData(true);
+        });
+        return unsubscribe;
+    }, [navigation, loadData]);
+
     const onRefresh = () => {
         setRefreshing(true);
         loadData(true);
@@ -100,7 +94,7 @@ const AgentRatingsScreen = ({ navigation, route }) => {
                     key={i}
                     name="star"
                     size={size}
-                    color={i <= Math.round(rating) ? COLORS.starFilled : COLORS.starEmpty}
+                    color={i <= Math.floor(rating) ? COLORS.starFilled : COLORS.starEmpty}
                 />
             );
         }
@@ -250,7 +244,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     centerContainer: {
@@ -278,7 +272,7 @@ const styles = StyleSheet.create({
     },
     avgRating: {
         fontSize: 40,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     starsRow: {
@@ -288,7 +282,7 @@ const styles = StyleSheet.create({
     },
     totalReviews: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     summaryRight: {
@@ -304,7 +298,7 @@ const styles = StyleSheet.create({
     },
     distLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         width: 14,
         textAlign: 'center',
@@ -323,14 +317,14 @@ const styles = StyleSheet.create({
     },
     distCount: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
         width: 20,
         textAlign: 'right',
     },
     sectionTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 14,
     },
@@ -358,17 +352,17 @@ const styles = StyleSheet.create({
     reviewInfo: { flex: 1 },
     reviewName: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     reviewDate: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
     },
     reviewText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 21,
         marginTop: 12,
@@ -391,13 +385,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
     emptySubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
     },
@@ -411,7 +405,7 @@ const styles = StyleSheet.create({
     },
     loadMoreText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
 });

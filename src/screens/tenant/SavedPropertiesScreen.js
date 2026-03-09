@@ -16,18 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getSavedProperties, unsaveProperty } from '../../lib/propertyService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const SavedPropertiesScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -58,6 +47,14 @@ const SavedPropertiesScreen = ({ navigation }) => {
     useEffect(() => {
         fetchSaved();
     }, [fetchSaved]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchSaved();
+        });
+        return unsubscribe;
+    }, [navigation, fetchSaved]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -110,7 +107,7 @@ const SavedPropertiesScreen = ({ navigation }) => {
                 {/* Image */}
                 <View style={styles.imageContainer}>
                     {imageUri ? (
-                        <Image source={{ uri: imageUri }} style={styles.propertyImage} />
+                        <Image source={{ uri: imageUri }} style={styles.propertyImage} onError={() => {}} />
                     ) : (
                         <View style={styles.imagePlaceholder}>
                             <Feather name="home" size={32} color={COLORS.border} />
@@ -258,7 +255,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Header
@@ -280,7 +277,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     headerPlaceholder: {
@@ -296,7 +293,7 @@ const styles = StyleSheet.create({
     },
     countText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Scroll
@@ -353,7 +350,7 @@ const styles = StyleSheet.create({
     },
     listingTypeText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         letterSpacing: 0.5,
     },
@@ -362,7 +359,7 @@ const styles = StyleSheet.create({
     },
     propertyTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
@@ -374,7 +371,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         flex: 1,
     },
@@ -390,7 +387,7 @@ const styles = StyleSheet.create({
     },
     detailText: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     cardFooter: {
@@ -400,12 +397,12 @@ const styles = StyleSheet.create({
     },
     priceText: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     pricePeriod: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginLeft: 2,
     },
@@ -427,12 +424,12 @@ const styles = StyleSheet.create({
     },
     agentAvatarText: {
         fontSize: 12,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     agentName: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         flex: 1,
     },
@@ -454,13 +451,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         lineHeight: 20,

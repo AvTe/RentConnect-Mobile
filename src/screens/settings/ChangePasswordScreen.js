@@ -15,15 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../context/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    error: '#EF4444',
-    errorLight: '#FEE2E2',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const ChangePasswordScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -292,7 +284,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     headerPlaceholder: {
         width: 40,
@@ -315,7 +307,7 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         lineHeight: 19,
     },
     inputGroup: {
@@ -323,7 +315,7 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         marginBottom: 8,
     },
     inputContainer: {
@@ -340,7 +332,7 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     strengthContainer: {
         flexDirection: 'row',
@@ -360,11 +352,11 @@ const styles = StyleSheet.create({
     },
     strengthLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     mismatchText: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: '#EF4444',
         marginTop: 6,
     },
@@ -385,7 +377,7 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     // Success state
     successContainer: {
@@ -399,12 +391,12 @@ const styles = StyleSheet.create({
     },
     successTitle: {
         fontSize: 24,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         marginBottom: 12,
     },
     successDesc: {
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         textAlign: 'center',
         lineHeight: 22,
         marginBottom: 32,
@@ -419,7 +411,7 @@ const styles = StyleSheet.create({
     doneButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
 });
 

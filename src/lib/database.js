@@ -361,6 +361,34 @@ export const getWalletBalance = async (userId) => {
 };
 
 /**
+ * Subscribe to real-time wallet balance changes for a user.
+ * Listens for UPDATE events on the users table filtered by user id.
+ * Returns an unsubscribe function.
+ */
+export const subscribeToWalletChanges = (userId, callback) => {
+    const channel = supabase
+        .channel(`wallet-${userId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'users',
+                filter: `id=eq.${userId}`
+            },
+            (payload) => {
+                const newBalance = parseFloat(payload.new?.wallet_balance || 0);
+                callback(newBalance);
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+};
+
+/**
  * Get referral stats for user
  */
 export const getReferralStats = async (userId) => {

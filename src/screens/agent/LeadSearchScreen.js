@@ -12,6 +12,7 @@ import {
     Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -21,17 +22,7 @@ import {
     getLeadState,
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const LeadSearchScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -44,9 +35,20 @@ const LeadSearchScreen = ({ navigation }) => {
     const [query, setQuery] = useState('');
     const [leads, setLeads] = useState([]);
     const [unlockedLeadIds, setUnlockedLeadIds] = useState(new Set());
-    const [recentSearches, setRecentSearches] = useState([
-        'Studio', 'Nairobi', '2 Bedroom', 'Meru', 'Apartment',
-    ]);
+    const [recentSearches, setRecentSearches] = useState([]);
+
+    const SEARCH_HISTORY_KEY = 'lead_search_history';
+    const DEFAULT_SEARCHES = ['Studio', 'Nairobi', '2 Bedroom', 'Meru', 'Apartment'];
+
+    const saveSearch = useCallback(async (term) => {
+        const trimmed = term.trim();
+        if (!trimmed) return;
+        setRecentSearches(prev => {
+            const updated = [trimmed, ...prev.filter(s => s.toLowerCase() !== trimmed.toLowerCase())].slice(0, 10);
+            AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated)).catch(() => {});
+            return updated;
+        });
+    }, []);
 
     useEffect(() => {
         // Entry animation
@@ -70,6 +72,15 @@ const LeadSearchScreen = ({ navigation }) => {
 
         // Load leads data
         loadData();
+
+        // Load search history
+        AsyncStorage.getItem(SEARCH_HISTORY_KEY).then(data => {
+            if (data) {
+                try { setRecentSearches(JSON.parse(data)); } catch {}
+            } else {
+                setRecentSearches(DEFAULT_SEARCHES);
+            }
+        }).catch(() => setRecentSearches(DEFAULT_SEARCHES));
 
         return () => clearTimeout(timer);
     }, []);
@@ -116,11 +127,13 @@ const LeadSearchScreen = ({ navigation }) => {
 
     const handleLeadPress = (lead) => {
         Keyboard.dismiss();
+        if (query.trim()) saveSearch(query);
         navigation.replace('LeadDetail', { leadId: lead.id });
     };
 
     const handleSuggestionPress = (suggestion) => {
         setQuery(suggestion);
+        saveSearch(suggestion);
     };
 
     const formatBudget = (budget) => {
@@ -335,8 +348,10 @@ const styles = StyleSheet.create({
     searchInputActive: {
         flex: 1,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         paddingVertical: 0,
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     cancelBtn: {
         paddingVertical: 8,
@@ -344,7 +359,7 @@ const styles = StyleSheet.create({
     },
     cancelText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     suggestionsContainer: {
         flex: 1,
@@ -353,7 +368,7 @@ const styles = StyleSheet.create({
     },
     sectionLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 1,
         marginBottom: 14,
     },
@@ -373,7 +388,7 @@ const styles = StyleSheet.create({
     },
     chipText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     hintRow: {
         flexDirection: 'row',
@@ -394,11 +409,11 @@ const styles = StyleSheet.create({
     },
     hintLabel: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     hintExample: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginTop: 2,
     },
     resultsWrapper: {
@@ -407,7 +422,7 @@ const styles = StyleSheet.create({
     },
     resultCount: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         paddingVertical: 12,
         paddingHorizontal: 4,
     },
@@ -433,7 +448,7 @@ const styles = StyleSheet.create({
     },
     resultAvatarText: {
         fontSize: 17,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     resultContent: {
         flex: 1,
@@ -441,7 +456,7 @@ const styles = StyleSheet.create({
     },
     resultTitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     resultMeta: {
         flexDirection: 'row',
@@ -450,7 +465,7 @@ const styles = StyleSheet.create({
     },
     resultMetaText: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     resultDot: {
         fontSize: 12,
@@ -468,7 +483,7 @@ const styles = StyleSheet.create({
     },
     slotPillText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     unlockedPill: {
         flexDirection: 'row',
@@ -477,7 +492,7 @@ const styles = StyleSheet.create({
     },
     unlockedPillText: {
         fontSize: 10,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#10B981',
     },
     emptyContainer: {
@@ -495,12 +510,12 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         marginBottom: 6,
     },
     emptyText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         textAlign: 'center',
         lineHeight: 20,
     },

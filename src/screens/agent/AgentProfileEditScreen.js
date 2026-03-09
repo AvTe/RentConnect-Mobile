@@ -19,19 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { updateUser } from '../../lib/database';
 import { sendOTP, verifyOTP } from '../../lib/api';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const AgentProfileEditScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -84,6 +72,32 @@ const AgentProfileEditScreen = ({ navigation }) => {
             }
         }
     }, [userData, user]);
+
+    // Unsaved changes detection
+    const hasUnsavedChanges = userData ? (
+        formData.name !== (userData.name || '') ||
+        formData.phone !== (userData.phone || '') ||
+        formData.agencyName !== (userData.agency_name || userData.agencyName || '') ||
+        formData.bio !== (userData.bio || '') ||
+        formData.experience !== (userData.experience?.toString() || '') ||
+        formData.specialization !== (userData.specialization || '')
+    ) : false;
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!hasUnsavedChanges) return;
+            e.preventDefault();
+            Alert.alert(
+                'Discard changes?',
+                'You have unsaved changes. Are you sure you want to leave?',
+                [
+                    { text: 'Stay', style: 'cancel' },
+                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+                ]
+            );
+        });
+        return unsubscribe;
+    }, [navigation, hasUnsavedChanges]);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -550,7 +564,7 @@ const AgentProfileEditScreen = ({ navigation }) => {
                         <Text style={styles.modalTitle}>Verify Phone</Text>
                         <Text style={styles.modalSubtitle}>
                             Enter the verification code sent to{' '}
-                            <Text style={{ fontFamily: 'DMSans_600SemiBold' }}>{formData.phone}</Text>
+                            <Text style={{ fontFamily: FONTS.semiBold }}>{formData.phone}</Text>
                         </Text>
                         <TextInput
                             style={styles.otpInput}
@@ -606,7 +620,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     saveButton: {
@@ -618,7 +632,7 @@ const styles = StyleSheet.create({
     },
     saveButtonText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     scrollView: {
@@ -660,7 +674,7 @@ const styles = StyleSheet.create({
     },
     photoPlaceholderText: {
         fontSize: 40,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     cameraIcon: {
@@ -678,7 +692,7 @@ const styles = StyleSheet.create({
     },
     changePhotoText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     // Sections
@@ -687,7 +701,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 12,
     },
@@ -697,7 +711,7 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         marginBottom: 6,
     },
@@ -709,7 +723,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     inputMultiline: {
@@ -746,12 +760,12 @@ const styles = StyleSheet.create({
     },
     quickLinkTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     quickLinkSubtitle: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 1,
     },
@@ -778,7 +792,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.success,
     },
     verifyBtn: {
@@ -792,7 +806,7 @@ const styles = StyleSheet.create({
     },
     verifyBtnText: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     // KYC / Identity Verification
@@ -821,13 +835,13 @@ const styles = StyleSheet.create({
     },
     kycStatusTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 2,
     },
     kycStatusDesc: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 18,
     },
@@ -844,12 +858,12 @@ const styles = StyleSheet.create({
     },
     docName: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     docHint: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 1,
     },
@@ -868,7 +882,7 @@ const styles = StyleSheet.create({
     },
     uploadBtnText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     submitKycBtn: {
@@ -880,12 +894,12 @@ const styles = StyleSheet.create({
     },
     submitKycBtnText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     kycHint: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         marginBottom: 8,
@@ -921,13 +935,13 @@ const styles = StyleSheet.create({
     },
     modalTitle: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 8,
     },
     modalSubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         marginBottom: 24,
@@ -942,7 +956,7 @@ const styles = StyleSheet.create({
         borderColor: COLORS.border,
         textAlign: 'center',
         fontSize: 24,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         letterSpacing: 8,
         marginBottom: 20,
@@ -957,13 +971,13 @@ const styles = StyleSheet.create({
     },
     modalBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     resendBtn: { padding: 8 },
     resendBtnText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
     },
 });

@@ -13,22 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getWalletBalance } from '../../lib/database';
+import { getWalletBalance, subscribeToWalletChanges } from '../../lib/database';
 import { getWalletTransactions } from '../../lib/leadService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    error: '#EF4444',
-    errorLight: '#FEE2E2',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const TRANSACTION_ICONS = {
     purchase: { icon: 'credit-card', bg: '#DBEAFE', color: '#3B82F6' },
@@ -72,6 +59,25 @@ const AgentWalletScreen = ({ navigation }) => {
     useEffect(() => {
         fetchWalletData();
     }, [fetchWalletData]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchWalletData();
+        });
+        return unsubscribe;
+    }, [navigation, fetchWalletData]);
+
+    // Real-time wallet balance subscription
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsubscribe = subscribeToWalletChanges(user.id, (newBalance) => {
+            setBalance(newBalance);
+        });
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user?.id]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -137,15 +143,7 @@ const AgentWalletScreen = ({ navigation }) => {
         );
     };
 
-    // Demo transactions for display
-    const demoTransactions = [
-        { id: 1, type: 'purchase', description: 'Credits Purchased', amount: 50, created_at: new Date().toISOString() },
-        { id: 2, type: 'unlock', description: 'Lead Unlocked', amount: 1, created_at: new Date(Date.now() - 86400000).toISOString() },
-        { id: 3, type: 'unlock', description: 'Lead Unlocked', amount: 1, created_at: new Date(Date.now() - 172800000).toISOString() },
-        { id: 4, type: 'withdrawal', description: 'Withdrawal', amount: 500, created_at: new Date(Date.now() - 604800000).toISOString() },
-    ];
-
-    const displayTransactions = transactions.length > 0 ? transactions : demoTransactions;
+    const displayTransactions = transactions;
 
     if (loading) {
         return (
@@ -233,9 +231,17 @@ const AgentWalletScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.transactionsList}>
-                    {displayTransactions.map((transaction) => (
-                        <TransactionItem key={transaction.id} transaction={transaction} />
-                    ))}
+                    {displayTransactions.length > 0 ? (
+                        displayTransactions.map((transaction) => (
+                            <TransactionItem key={transaction.id} transaction={transaction} />
+                        ))
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <Feather name="inbox" size={40} color={COLORS.textSecondary} />
+                            <Text style={styles.emptyStateTitle}>No Transactions Yet</Text>
+                            <Text style={styles.emptyStateText}>Your transaction history will appear here once you make your first purchase.</Text>
+                        </View>
+                    )}
                 </View>
 
                 <View style={{ height: 100 }} />
@@ -275,12 +281,12 @@ const styles = StyleSheet.create({
     },
     logoR: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     headerTitle: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginLeft: 12,
     },
@@ -313,7 +319,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     scrollView: {
@@ -332,7 +338,7 @@ const styles = StyleSheet.create({
     },
     balanceLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
         letterSpacing: 1,
         marginBottom: 8,
@@ -343,12 +349,12 @@ const styles = StyleSheet.create({
     },
     balanceAmount: {
         fontSize: 56,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     balanceUnit: {
         fontSize: 20,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         marginLeft: 8,
     },
@@ -388,7 +394,7 @@ const styles = StyleSheet.create({
     },
     actionLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     sectionHeader: {
@@ -399,12 +405,12 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     seeAllText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     transactionsList: {
@@ -413,6 +419,24 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: COLORS.border,
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        paddingHorizontal: 20,
+    },
+    emptyStateTitle: {
+        fontSize: 16,
+        fontFamily: FONTS.semiBold,
+        color: COLORS.text,
+        marginTop: 12,
+    },
+    emptyStateText: {
+        fontSize: 14,
+        fontFamily: FONTS.regular,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginTop: 4,
     },
     transactionItem: {
         flexDirection: 'row',
@@ -434,18 +458,18 @@ const styles = StyleSheet.create({
     },
     transactionTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     transactionDate: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     transactionAmount: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
 });
 

@@ -40,6 +40,7 @@ const SignUpScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { signUp } = useAuth();
 
   const validateEmail = (email) => {
@@ -298,8 +299,18 @@ const SignUpScreen = ({ navigation }) => {
                   placeholderTextColor="#9CA3AF"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  secureTextEntry={!showPassword}
+                  secureTextEntry={!showConfirmPassword}
                 />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeButton}
+                >
+                  <Feather
+                    name={showConfirmPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#9CA3AF"
+                  />
+                </TouchableOpacity>
               </View>
             </View>
 

@@ -3,7 +3,7 @@ import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
+    FlatList,
     TouchableOpacity,
     RefreshControl,
     ActivityIndicator,
@@ -26,25 +26,10 @@ import {
     subscribeToLeads,
     LEAD_STATE_STYLES,
 } from '../../lib/leadService';
-import { getWalletBalance } from '../../lib/database';
+import { getWalletBalance, subscribeToWalletChanges } from '../../lib/database';
+import { COLORS, FONTS } from '../../constants/theme';
 
-// Static colors for styles (light mode defaults)
-// Dynamic theming is applied via inline styles using colors from useTheme
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    warningLight: '#FEF3C7',
-    error: '#EF4444',
-    expired: '#9CA3AF',
-};
+const PAGE_SIZE = 20;
 
 const AgentLeadsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -60,6 +45,8 @@ const AgentLeadsScreen = ({ navigation }) => {
     const [totalLeads, setTotalLeads] = useState(0);
     const [sortBy, setSortBy] = useState('newest');
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const SORT_OPTIONS = [
         { key: 'newest', label: 'Newest First', icon: 'clock' },
@@ -88,40 +75,73 @@ const AgentLeadsScreen = ({ navigation }) => {
         return 'Agent';
     };
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (append = false) => {
         if (!user?.id) return;
 
         try {
-            // Fetch leads
-            const leadsResult = await fetchLeads();
+            const offset = append ? leads.length : 0;
+            // Fetch leads with pagination
+            const leadsResult = await fetchLeads({ limit: PAGE_SIZE, offset });
             if (leadsResult.success) {
-                setLeads(leadsResult.leads);
-                setTotalLeads(leadsResult.count);
+                const newLeads = leadsResult.leads;
+                if (append) {
+                    setLeads(prev => {
+                        const updated = [...prev, ...newLeads];
+                        setTotalLeads(updated.length);
+                        return updated;
+                    });
+                } else {
+                    setLeads(newLeads);
+                    setTotalLeads(newLeads.length);
+                }
+                setHasMore(newLeads.length === PAGE_SIZE);
             }
 
-            // Fetch unlocked lead IDs
-            const unlockedResult = await getUnlockedLeadIds(user.id);
-            if (unlockedResult.success) {
-                setUnlockedLeadIds(new Set(unlockedResult.leadIds));
-            }
+            if (!append) {
+                // Fetch unlocked lead IDs
+                const unlockedResult = await getUnlockedLeadIds(user.id);
+                if (unlockedResult.success) {
+                    setUnlockedLeadIds(new Set(unlockedResult.leadIds));
+                }
 
-            // Fetch credit balance
-            const balanceResult = await getWalletBalance(user.id);
-            if (balanceResult.success) {
-                setCreditBalance(balanceResult.balance);
+                // Fetch credit balance
+                const balanceResult = await getWalletBalance(user.id);
+                if (balanceResult.success) {
+                    setCreditBalance(balanceResult.balance);
+                }
             }
         } catch (error) {
             console.error('Error loading data:', error);
-            toast.error('Failed to load leads');
+            if (!append) toast.error('Failed to load leads');
         } finally {
             setLoading(false);
             setRefreshing(false);
+            setLoadingMore(false);
         }
-    }, [user?.id]);
+    }, [user?.id, leads.length]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadData();
+        });
+        return unsubscribe;
+    }, [navigation, loadData]);
+
+    // Real-time wallet balance subscription
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsubscribe = subscribeToWalletChanges(user.id, (newBalance) => {
+            setCreditBalance(newBalance);
+        });
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user?.id]);
 
     // Real-time lead subscription — matches web's subscribeToLeads
     useEffect(() => {
@@ -136,8 +156,12 @@ const AgentLeadsScreen = ({ navigation }) => {
                     lead.id === payload.new.id ? { ...lead, ...payload.new } : lead
                 ));
             } else if (payload.eventType === 'DELETE') {
-                // Lead removed
-                setLeads(prev => prev.filter(lead => lead.id !== payload.old.id));
+                // Lead removed — update list and count
+                setLeads(prev => {
+                    const updated = prev.filter(lead => lead.id !== payload.old.id);
+                    setTotalLeads(updated.length);
+                    return updated;
+                });
             }
         });
 
@@ -148,8 +172,15 @@ const AgentLeadsScreen = ({ navigation }) => {
 
     const onRefresh = () => {
         setRefreshing(true);
+        setHasMore(true);
         loadData();
     };
+
+    const loadMore = useCallback(() => {
+        if (!hasMore || loadingMore || loading) return;
+        setLoadingMore(true);
+        loadData(true);
+    }, [hasMore, loadingMore, loading, loadData]);
 
     const handleUnlock = async (lead, isExclusive = false) => {
         const cost = isExclusive ? calculateExclusiveCost(lead) : calculateUnlockCost(lead);
@@ -439,12 +470,159 @@ const AgentLeadsScreen = ({ navigation }) => {
         );
     }
 
+    const ListHeader = () => (
+        <>
+            {/* Header */}
+            <View style={styles.header}>
+                <View style={styles.headerTop}>
+                    <View style={styles.headerLeft}>
+                        <Text style={[styles.logoText, { color: colors.primary }]}>Yoombaa</Text>
+                    </View>
+                    <View style={styles.headerRight}>
+                        <TouchableOpacity
+                            style={[styles.headerIconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                            onPress={() => navigation.navigate('Notifications')}
+                        >
+                            <Feather name="bell" size={18} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.avatarButton, { backgroundColor: colors.primaryLight }]}
+                            onPress={() => navigation.navigate('AgentProfileEdit')}
+                        >
+                            <Feather name="user" size={16} color={colors.primary} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Search bar */}
+                <TouchableOpacity
+                    style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('LeadSearch')}
+                >
+                    <Feather name="search" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.searchPlaceholder, { color: colors.textSecondary }]}>
+                        Search leads...
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Hero — Active Leads + Credits only */}
+            <View style={[styles.heroSection, { backgroundColor: colors.card }]}>
+                <View style={styles.heroRow}>
+                    <View style={styles.heroCard}>
+                        <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(254, 146, 0, 0.10)' }]}>
+                            <Feather name="zap" size={18} color={COLORS.primary} />
+                        </View>
+                        <Text style={[styles.heroValue, { color: colors.text }]}>{activeLeads}</Text>
+                        <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Active Leads</Text>
+                    </View>
+                    <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
+                    <TouchableOpacity style={styles.heroCard} onPress={() => navigation.navigate('AgentWallet')} activeOpacity={0.7}>
+                        <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.10)' }]}>
+                            <Feather name="credit-card" size={18} color={COLORS.success} />
+                        </View>
+                        <Text style={[styles.heroValue, { color: colors.text }]}>{creditBalance}</Text>
+                        <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Credits</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Leads Section Header */}
+            <View style={styles.sectionHeader}>
+                <View>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Leads</Text>
+                    <View style={styles.leadCountRow}>
+                        <Text style={[styles.leadCountText, { color: colors.textSecondary }]}>
+                            {totalLeads} total
+                        </Text>
+                        <View style={[styles.countDot, { backgroundColor: colors.border }]} />
+                        <Text style={[styles.leadCountText, { color: COLORS.primary }]}>
+                            {activeLeads} active
+                        </Text>
+                    </View>
+                </View>
+                <TouchableOpacity
+                    style={[styles.filterButton, { borderColor: colors.border }]}
+                    onPress={() => navigation.navigate('LeadFilters')}
+                >
+                    <Feather name="sliders" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.filterBtnText, { color: colors.textSecondary }]}>Filter</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Sort Row */}
+            <TouchableOpacity
+                style={[styles.sortRow, { borderColor: colors.border }]}
+                onPress={() => setShowSortMenu(!showSortMenu)}
+                activeOpacity={0.7}
+            >
+                <Feather name="bar-chart-2" size={14} color={COLORS.primary} />
+                <Text style={styles.sortLabel}>
+                    {SORT_OPTIONS.find(s => s.key === sortBy)?.label || 'Newest First'}
+                </Text>
+                <Feather name={showSortMenu ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            {showSortMenu && (
+                <View style={[styles.sortMenu, { borderColor: colors.border }]}>
+                    {SORT_OPTIONS.map((opt) => (
+                        <TouchableOpacity
+                            key={opt.key}
+                            style={[styles.sortMenuItem, sortBy === opt.key && styles.sortMenuItemActive]}
+                            onPress={() => { setSortBy(opt.key); setShowSortMenu(false); }}
+                        >
+                            <Feather name={opt.icon} size={15}
+                                color={sortBy === opt.key ? COLORS.primary : COLORS.textSecondary} />
+                            <Text style={[styles.sortMenuText,
+                                sortBy === opt.key && { color: COLORS.primary, fontFamily: FONTS.semiBold }]}>
+                                {opt.label}
+                            </Text>
+                            {sortBy === opt.key && (
+                                <Feather name="check" size={16} color={COLORS.primary} style={{ marginLeft: 'auto' }} />
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
+        </>
+    );
+
+    const ListFooter = () => {
+        if (loadingMore) {
+            return (
+                <View style={styles.loadMoreContainer}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <Text style={[styles.loadMoreText, { color: colors.textSecondary }]}>Loading more...</Text>
+                </View>
+            );
+        }
+        return <View style={{ height: 100 }} />;
+    };
+
+    const ListEmpty = () => (
+        <View style={styles.emptyState}>
+            <Feather name="inbox" size={48} color={COLORS.textSecondary} />
+            <Text style={styles.emptyTitle}>No leads found</Text>
+            <Text style={styles.emptyText}>
+                {searchQuery ? 'Try adjusting your search' : 'New leads will appear here'}
+            </Text>
+        </View>
+    );
+
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
-            <ScrollView
+            <FlatList
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                data={filteredLeads}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => <LeadCard lead={item} />}
+                ListHeaderComponent={ListHeader}
+                ListFooterComponent={ListFooter}
+                ListEmptyComponent={ListEmpty}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.3}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -452,140 +630,7 @@ const AgentLeadsScreen = ({ navigation }) => {
                         colors={[COLORS.primary]}
                     />
                 }
-            >
-                {/* Header — scrolls with page */}
-                <View style={[styles.header, { backgroundColor: colors.card }]}>
-                    <View style={styles.headerTop}>
-                        <View style={styles.headerLeft}>
-                            <Feather name="home" size={22} color={colors.primary} />
-                            <Text style={[styles.logoText, { color: colors.text }]}>yoombaa</Text>
-                        </View>
-                        <View style={styles.headerRight}>
-                            <TouchableOpacity
-                                style={[styles.headerIconBtn, { backgroundColor: colors.background }]}
-                                onPress={() => navigation.navigate('Notifications')}
-                            >
-                                <Feather name="bell" size={20} color={colors.text} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.avatarButton, { backgroundColor: colors.primaryLight }]}
-                                onPress={() => navigation.navigate('AgentProfileEdit')}
-                            >
-                                <Feather name="user" size={16} color={colors.primary} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Search bar in header area */}
-                    <TouchableOpacity
-                        style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}
-                        activeOpacity={0.7}
-                        onPress={() => navigation.navigate('LeadSearch')}
-                    >
-                        <Feather name="search" size={16} color={colors.textSecondary} />
-                        <Text style={[styles.searchPlaceholder, { color: colors.textSecondary }]}>
-                            Search leads...
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Hero — Active Leads + Credits only */}
-                <View style={[styles.heroSection, { backgroundColor: colors.card }]}>
-                    <View style={styles.heroRow}>
-                        <View style={styles.heroCard}>
-                            <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(254, 146, 0, 0.10)' }]}>
-                                <Feather name="zap" size={18} color={COLORS.primary} />
-                            </View>
-                            <Text style={[styles.heroValue, { color: colors.text }]}>{activeLeads}</Text>
-                            <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Active Leads</Text>
-                        </View>
-                        <View style={[styles.heroDivider, { backgroundColor: colors.border }]} />
-                        <TouchableOpacity style={styles.heroCard} onPress={() => navigation.navigate('AgentWallet')} activeOpacity={0.7}>
-                            <View style={[styles.heroIconWrap, { backgroundColor: 'rgba(16, 185, 129, 0.10)' }]}>
-                                <Feather name="credit-card" size={18} color={COLORS.success} />
-                            </View>
-                            <Text style={[styles.heroValue, { color: colors.text }]}>{creditBalance}</Text>
-                            <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>Credits</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Leads Section Header */}
-                <View style={styles.sectionHeader}>
-                    <View>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Available Leads</Text>
-                        <View style={styles.leadCountRow}>
-                            <Text style={[styles.leadCountText, { color: colors.textSecondary }]}>
-                                {totalLeads} total
-                            </Text>
-                            <View style={[styles.countDot, { backgroundColor: colors.border }]} />
-                            <Text style={[styles.leadCountText, { color: COLORS.primary }]}>
-                                {activeLeads} active
-                            </Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity
-                        style={[styles.filterButton, { borderColor: colors.border }]}
-                        onPress={() => navigation.navigate('LeadFilters')}
-                    >
-                        <Feather name="sliders" size={14} color={colors.textSecondary} />
-                        <Text style={[styles.filterBtnText, { color: colors.textSecondary }]}>Filter</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Sort Row */}
-                <TouchableOpacity
-                    style={[styles.sortRow, { borderColor: colors.border }]}
-                    onPress={() => setShowSortMenu(!showSortMenu)}
-                    activeOpacity={0.7}
-                >
-                    <Feather name="bar-chart-2" size={14} color={COLORS.primary} />
-                    <Text style={styles.sortLabel}>
-                        {SORT_OPTIONS.find(s => s.key === sortBy)?.label || 'Newest First'}
-                    </Text>
-                    <Feather name={showSortMenu ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-                {showSortMenu && (
-                    <View style={[styles.sortMenu, { borderColor: colors.border }]}>
-                        {SORT_OPTIONS.map((opt) => (
-                            <TouchableOpacity
-                                key={opt.key}
-                                style={[styles.sortMenuItem, sortBy === opt.key && styles.sortMenuItemActive]}
-                                onPress={() => { setSortBy(opt.key); setShowSortMenu(false); }}
-                            >
-                                <Feather name={opt.icon} size={15}
-                                    color={sortBy === opt.key ? COLORS.primary : COLORS.textSecondary} />
-                                <Text style={[styles.sortMenuText,
-                                    sortBy === opt.key && { color: COLORS.primary, fontFamily: 'DMSans_600SemiBold' }]}>
-                                    {opt.label}
-                                </Text>
-                                {sortBy === opt.key && (
-                                    <Feather name="check" size={16} color={COLORS.primary} style={{ marginLeft: 'auto' }} />
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-
-                {/* Leads List */}
-                <View style={styles.leadsList}>
-                    {filteredLeads.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Feather name="inbox" size={48} color={COLORS.textSecondary} />
-                            <Text style={styles.emptyTitle}>No leads found</Text>
-                            <Text style={styles.emptyText}>
-                                {searchQuery ? 'Try adjusting your search' : 'New leads will appear here'}
-                            </Text>
-                        </View>
-                    ) : (
-                        filteredLeads.map((lead) => (
-                            <LeadCard key={lead.id} lead={lead} />
-                        ))
-                    )}
-                </View>
-
-                <View style={{ height: 100 }} />
-            </ScrollView>
+            />
         </View>
     );
 };
@@ -602,14 +647,14 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Header
     header: {
-        paddingHorizontal: 20,
-        paddingTop: 14,
-        paddingBottom: 14,
+        paddingHorizontal: 4,
+        paddingTop: 16,
+        paddingBottom: 12,
     },
     headerTop: {
         flexDirection: 'row',
@@ -621,9 +666,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logoText: {
-        fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
-        marginLeft: 6,
+        fontSize: 24,
+        fontFamily: FONTS.bold,
+        letterSpacing: 0.2,
     },
     headerRight: {
         flexDirection: 'row',
@@ -631,41 +676,44 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     headerIconBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
     },
     avatarButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1.5,
         borderColor: COLORS.primary,
     },
-    // Search bar (in header)
+    // Search bar
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: 14,
-        height: 42,
-        borderRadius: 21,
-        paddingHorizontal: 14,
+        height: 44,
+        borderRadius: 12,
+        paddingHorizontal: 16,
         borderWidth: 1,
         gap: 10,
     },
     searchPlaceholder: {
         flex: 1,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
+        lineHeight: 18,
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     // Hero
     heroSection: {
-        marginTop: 8,
-        marginHorizontal: 20,
+        marginTop: 10,
         borderRadius: 16,
         overflow: 'hidden',
     },
@@ -690,12 +738,12 @@ const styles = StyleSheet.create({
     },
     heroValue: {
         fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         lineHeight: 32,
     },
     heroLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     heroDivider: {
         width: 1,
@@ -707,13 +755,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 4,
         marginTop: 20,
         marginBottom: 14,
     },
     sectionTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     leadCountRow: {
         flexDirection: 'row',
@@ -723,7 +771,7 @@ const styles = StyleSheet.create({
     },
     leadCountText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     countDot: {
         width: 3,
@@ -741,14 +789,14 @@ const styles = StyleSheet.create({
     },
     filterBtnText: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     // Sort
     sortRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginHorizontal: 20,
+        marginHorizontal: 0,
         marginBottom: 6,
         paddingHorizontal: 14,
         paddingVertical: 10,
@@ -759,11 +807,11 @@ const styles = StyleSheet.create({
     sortLabel: {
         flex: 1,
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     sortMenu: {
-        marginHorizontal: 20,
+        marginHorizontal: 0,
         marginBottom: 12,
         backgroundColor: '#FFFFFF',
         borderRadius: 14,
@@ -782,7 +830,7 @@ const styles = StyleSheet.create({
     },
     sortMenuText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     scrollView: {
@@ -790,9 +838,10 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: 20,
+        paddingHorizontal: 16,
     },
     leadsList: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 0,
     },
     emptyState: {
         alignItems: 'center',
@@ -800,15 +849,26 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginTop: 16,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 4,
+    },
+    loadMoreContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 20,
+        gap: 8,
+    },
+    loadMoreText: {
+        fontSize: 13,
+        fontFamily: FONTS.medium,
     },
     // Lead Card
     leadCard: {
@@ -845,7 +905,7 @@ const styles = StyleSheet.create({
     },
     statText: {
         fontSize: 13,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
     },
     budgetBadge: {
@@ -862,7 +922,7 @@ const styles = StyleSheet.create({
     },
     budgetText: {
         fontSize: 12,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.success,
     },
     budgetTextHigh: {
@@ -871,7 +931,7 @@ const styles = StyleSheet.create({
     // Title
     leadTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         paddingHorizontal: 16,
         marginBottom: 12,
@@ -897,7 +957,7 @@ const styles = StyleSheet.create({
     },
     tagText: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Slots Container
@@ -921,7 +981,7 @@ const styles = StyleSheet.create({
     },
     slotsLabel: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
@@ -947,7 +1007,7 @@ const styles = StyleSheet.create({
     },
     slotNumber: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     slotNumberFilled: {
         color: '#FFFFFF',
@@ -962,7 +1022,7 @@ const styles = StyleSheet.create({
     },
     slotsCount: {
         fontSize: 12,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     statusBadge: {
         paddingHorizontal: 8,
@@ -971,7 +1031,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 9,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 0.3,
     },
     // Tenant Row
@@ -996,7 +1056,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
     },
     tenantInfo: {
@@ -1004,12 +1064,12 @@ const styles = StyleSheet.create({
     },
     tenantName: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     tenantStatus: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 1,
     },
@@ -1026,7 +1086,7 @@ const styles = StyleSheet.create({
     },
     unlockedText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.success,
     },
     // Actions
@@ -1052,7 +1112,7 @@ const styles = StyleSheet.create({
     },
     callButtonText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     chatButton: {
@@ -1067,7 +1127,7 @@ const styles = StyleSheet.create({
     },
     chatButtonText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: '#FFFFFF',
     },
     unlockActions: {
@@ -1084,7 +1144,7 @@ const styles = StyleSheet.create({
     },
     unlockButtonText: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     exclusiveButton: {
@@ -1100,7 +1160,7 @@ const styles = StyleSheet.create({
     },
     exclusiveButtonText: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.primary,
     },
     expiredButton: {
@@ -1114,7 +1174,7 @@ const styles = StyleSheet.create({
     },
     expiredButtonText: {
         fontSize: 12,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.expired,
         letterSpacing: 0.5,
     },
@@ -1129,7 +1189,7 @@ const styles = StyleSheet.create({
     },
     soldOutButtonText: {
         fontSize: 12,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.error,
         letterSpacing: 0.5,
     },

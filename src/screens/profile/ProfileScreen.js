@@ -16,19 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { updateUser } from '../../lib/database';
 import { supabase } from '../../lib/supabase';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const ProfileScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -211,7 +199,7 @@ const ProfileScreen = ({ navigation }) => {
                 <View style={styles.photoSection}>
                     <TouchableOpacity style={styles.photoContainer} onPress={handlePickImage}>
                         {profileImage ? (
-                            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                            <Image source={{ uri: profileImage }} style={styles.profileImage} onError={() => {}} />
                         ) : (
                             <View style={styles.photoPlaceholder}>
                                 <Feather name="user" size={36} color={COLORS.primary} />
@@ -325,7 +313,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     saveHeaderBtn: {
@@ -337,7 +325,7 @@ const styles = StyleSheet.create({
     },
     saveHeaderBtnText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     scrollView: {
@@ -391,7 +379,7 @@ const styles = StyleSheet.create({
     },
     changePhotoText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     section: {
@@ -399,7 +387,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 12,
     },
@@ -408,7 +396,7 @@ const styles = StyleSheet.create({
     },
     inputLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         marginBottom: 6,
     },
@@ -420,7 +408,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     inputDisabled: {
@@ -444,7 +432,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.success,
     },
     phoneInputRow: {
@@ -467,7 +455,7 @@ const styles = StyleSheet.create({
     },
     codeText: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     phoneDivider: {
@@ -480,7 +468,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     footer: {
@@ -502,7 +490,7 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
 });
 

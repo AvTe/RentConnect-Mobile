@@ -12,27 +12,16 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getWalletBalance } from '../../lib/database';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    error: '#EF4444',
-};
+import { getWalletBalance, subscribeToWalletChanges } from '../../lib/database';
+import { checkSubscriptionStatus } from '../../lib/subscriptionService';
+import { COLORS, FONTS } from '../../constants/theme';
 
 const AgentAccountScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const { user, userData, signOut } = useAuth();
     const [walletBalance, setWalletBalance] = useState(0);
-    const [plan] = useState('Free');
+    const [plan, setPlan] = useState('Free');
 
     useEffect(() => {
         const fetchBalance = async () => {
@@ -41,9 +30,37 @@ const AgentAccountScreen = ({ navigation }) => {
                 if (result.success) {
                     setWalletBalance(result.balance);
                 }
+                const subResult = await checkSubscriptionStatus(user.id);
+                setPlan(subResult.isSubscribed ? subResult.subscription?.plan_name || 'Active' : 'Free');
             }
         };
         fetchBalance();
+    }, [user?.id]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            if (user?.id) {
+                getWalletBalance(user.id).then(result => {
+                    if (result.success) setWalletBalance(result.balance);
+                });
+                checkSubscriptionStatus(user.id).then(result => {
+                    setPlan(result.isSubscribed ? result.subscription?.plan_name || 'Active' : 'Free');
+                });
+            }
+        });
+        return unsubscribe;
+    }, [navigation, user?.id]);
+
+    // Real-time wallet balance subscription
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsubscribe = subscribeToWalletChanges(user.id, (newBalance) => {
+            setWalletBalance(newBalance);
+        });
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, [user?.id]);
 
     const handleSignOut = () => {
@@ -283,7 +300,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 24,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     settingsButton: {
@@ -323,7 +340,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 36,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     verifiedBadge: {
@@ -341,7 +358,7 @@ const styles = StyleSheet.create({
     },
     profileName: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 6,
     },
@@ -356,7 +373,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.success,
     },
     statsRow: {
@@ -378,19 +395,19 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
         marginBottom: 4,
     },
     statValue: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     statValueDark: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     menuSection: {
@@ -417,7 +434,7 @@ const styles = StyleSheet.create({
     menuTitle: {
         flex: 1,
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
         marginLeft: 14,
     },
@@ -428,7 +445,7 @@ const styles = StyleSheet.create({
     },
     menuValue: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
     },
     menuDivider: {
@@ -448,13 +465,13 @@ const styles = StyleSheet.create({
     },
     signOutText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     versionText: {
         textAlign: 'center',
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 16,
     },

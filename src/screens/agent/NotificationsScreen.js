@@ -12,27 +12,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getUserNotifications, markNotificationRead, markAllNotificationsRead } from '../../lib/notificationService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    warningLight: '#FEF3C7',
-    error: '#EF4444',
-    errorLight: '#FEE2E2',
-    blue: '#3B82F6',
-    blueLight: '#DBEAFE',
-    purple: '#8B5CF6',
-    purpleLight: '#EDE9FE',
-};
+import { getUserNotifications, markNotificationRead, markAllNotificationsRead, subscribeToNotifications } from '../../lib/notificationService';
+import { COLORS, FONTS } from '../../constants/theme';
 
 const NOTIFICATION_ICONS = {
     new_lead: { icon: 'user-plus', bg: COLORS.successLight, color: COLORS.success },
@@ -141,6 +122,25 @@ const NotificationsScreen = ({ navigation }) => {
     useEffect(() => {
         fetchNotifications();
     }, [fetchNotifications]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchNotifications();
+        });
+        return unsubscribe;
+    }, [navigation, fetchNotifications]);
+
+    // Real-time notification subscription
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsubscribe = subscribeToNotifications(user.id, (data) => {
+            setNotifications(data || []);
+        });
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user?.id]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Header
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         flex: 1,
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginLeft: 8,
     },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     },
     markAllText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     // Filter
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     },
     filterText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
     },
     filterTextActive: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     },
     countText: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     scrollView: {
@@ -508,11 +508,11 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     titleUnread: {
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     unreadDot: {
         width: 8,
@@ -522,13 +522,13 @@ const styles = StyleSheet.create({
     },
     message: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     time: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -550,13 +550,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         paddingHorizontal: 32,

@@ -20,21 +20,7 @@ import {
     deleteProperty,
     PROPERTY_TYPES,
 } from '../../lib/propertyService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const FILTER_TABS = ['All', 'Active', 'Rented', 'Inactive'];
 
@@ -136,7 +122,7 @@ const PropertyListScreen = ({ navigation }) => {
             {/* Image Placeholder */}
             <View style={styles.imageWrap}>
                 {property.images && property.images.length > 0 ? (
-                    <Image source={{ uri: property.images[0] }} style={styles.propertyImage} />
+                    <Image source={{ uri: property.images[0] }} style={styles.propertyImage} onError={() => {}} />
                 ) : (
                     <View style={styles.imagePlaceholder}>
                         <Feather name={getPropertyIcon(property.property_type)} size={28} color={COLORS.textLight} />
@@ -196,12 +182,6 @@ const PropertyListScreen = ({ navigation }) => {
             {/* Actions */}
             <View style={styles.cardActions}>
                 <TouchableOpacity
-                    style={styles.actionBtn}
-                    onPress={() => navigation.navigate('CreateProperty', { editProperty: property })}
-                >
-                    <Feather name="edit-2" size={15} color={COLORS.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity
                     style={[styles.actionBtn, { borderColor: COLORS.error }]}
                     onPress={() => handleDelete(property.id)}
                 >
@@ -219,12 +199,7 @@ const PropertyListScreen = ({ navigation }) => {
                     <Feather name="chevron-left" size={24} color={COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Properties</Text>
-                <TouchableOpacity
-                    onPress={() => navigation.navigate('CreateProperty')}
-                    style={styles.addBtn}
-                >
-                    <Feather name="plus" size={22} color={COLORS.primary} />
-                </TouchableOpacity>
+                <View style={{ width: 38 }} />
             </View>
 
             {/* Search */}
@@ -285,13 +260,7 @@ const PropertyListScreen = ({ navigation }) => {
                             <Text style={styles.emptySubtitle}>
                                 Add your property listings to reach more tenants
                             </Text>
-                            <TouchableOpacity
-                                style={styles.emptyBtn}
-                                onPress={() => navigation.navigate('CreateProperty')}
-                            >
-                                <Feather name="plus" size={18} color="#FFFFFF" />
-                                <Text style={styles.emptyBtnText}>Add Property</Text>
-                            </TouchableOpacity>
+
                         </View>
                     ) : (
                         filteredProperties.map(renderPropertyCard)
@@ -321,7 +290,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     addBtn: {
@@ -351,7 +320,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     filterRow: {
@@ -375,7 +344,7 @@ const styles = StyleSheet.create({
     },
     filterTabText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     filterTabTextActive: {
@@ -421,14 +390,14 @@ const styles = StyleSheet.create({
     },
     statusTagText: {
         fontSize: 11,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     cardBody: {
         padding: 14,
     },
     propertyTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
@@ -440,7 +409,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         flex: 1,
     },
@@ -451,12 +420,12 @@ const styles = StyleSheet.create({
     },
     priceText: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     perMonth: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginLeft: 2,
     },
@@ -471,7 +440,7 @@ const styles = StyleSheet.create({
     },
     featureText: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
     },
     cardActions: {
@@ -505,13 +474,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
     emptySubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         marginBottom: 24,
@@ -527,7 +496,7 @@ const styles = StyleSheet.create({
     },
     emptyBtnText: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
 });

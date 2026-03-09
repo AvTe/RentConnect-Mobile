@@ -11,21 +11,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
-// FIXME: Replace with actual Yoombaa support contact details before production release
-const SUPPORT_WHATSAPP = '254700000000'; // placeholder
+// TODO: Update with actual Yoombaa support contact details for production
+const SUPPORT_WHATSAPP = '254700000000'; // TODO: replace with actual WhatsApp number
 const SUPPORT_EMAIL = 'support@yoombaa.com';
-const SUPPORT_PHONE = '+254700000000'; // placeholder
+const SUPPORT_PHONE = '+254700000000'; // TODO: replace with actual phone number
 
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const FAQ_ITEMS = [
     {
@@ -197,7 +188,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     placeholder: {
@@ -231,13 +222,13 @@ const styles = StyleSheet.create({
     },
     contactTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         marginBottom: 4,
     },
     contactSubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.9)',
     },
     optionsRow: {
@@ -265,12 +256,12 @@ const styles = StyleSheet.create({
     },
     optionText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     sectionTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 16,
     },
@@ -289,14 +280,14 @@ const styles = StyleSheet.create({
     },
     faqQuestion: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         flex: 1,
         paddingRight: 12,
     },
     faqAnswer: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         lineHeight: 22,
         marginTop: 12,
@@ -316,7 +307,7 @@ const styles = StyleSheet.create({
     },
     ticketBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     ticketBtnOutline: {
@@ -334,7 +325,7 @@ const styles = StyleSheet.create({
     },
     ticketBtnOutlineText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
 });

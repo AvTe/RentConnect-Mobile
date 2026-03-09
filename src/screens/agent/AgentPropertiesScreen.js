@@ -15,21 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { getAgentUnlockedLeads } from '../../lib/leadService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    warningLight: '#FEF3C7',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const FILTER_TABS = ['All', 'Contacted', 'Converted', 'Pending'];
 
@@ -75,6 +61,14 @@ const AgentPropertiesScreen = ({ navigation }) => {
     useEffect(() => {
         fetchConnectedLeads();
     }, [fetchConnectedLeads]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchConnectedLeads();
+        });
+        return unsubscribe;
+    }, [navigation, fetchConnectedLeads]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -223,24 +217,6 @@ const AgentPropertiesScreen = ({ navigation }) => {
                 </TouchableOpacity>
             </View>
 
-            {/* Quick Actions */}
-            <View style={styles.quickActionsRow}>
-                <TouchableOpacity
-                    style={styles.quickActionBtn}
-                    onPress={() => navigation.navigate('CreateProperty')}
-                >
-                    <Feather name="plus" size={16} color={COLORS.primary} />
-                    <Text style={styles.quickActionText}>Add Property</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.quickActionBtn}
-                    onPress={() => navigation.navigate('PropertyList')}
-                >
-                    <Feather name="home" size={16} color={COLORS.primary} />
-                    <Text style={styles.quickActionText}>My Listings</Text>
-                </TouchableOpacity>
-            </View>
-
             {/* Search Bar */}
             <View style={styles.searchContainer}>
                 <Feather name="search" size={18} color={COLORS.textSecondary} />
@@ -351,7 +327,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     headerIcon: {
@@ -380,7 +356,7 @@ const styles = StyleSheet.create({
     },
     quickActionText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FE9200',
     },
     searchContainer: {
@@ -400,7 +376,7 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 10,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     sectionHeader: {
@@ -412,18 +388,18 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     sectionSubtitle: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
     totalCount: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
     },
     filterScroll: {
@@ -449,7 +425,7 @@ const styles = StyleSheet.create({
     },
     filterTabText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     filterTabTextActive: {
@@ -467,13 +443,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginTop: 16,
     },
     emptyText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 4,
     },
@@ -501,7 +477,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     leadInfo: {
@@ -515,7 +491,7 @@ const styles = StyleSheet.create({
     },
     leadName: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     statusRow: {
@@ -526,7 +502,7 @@ const styles = StyleSheet.create({
     },
     timeText: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     statusBadge: {
@@ -544,7 +520,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     lookingRow: {
         flexDirection: 'row',
@@ -554,18 +530,18 @@ const styles = StyleSheet.create({
     },
     lookingLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
     lookingValue: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     locationText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     phoneRow: {
@@ -578,7 +554,7 @@ const styles = StyleSheet.create({
     },
     phoneText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     actionButtons: {
@@ -612,7 +588,7 @@ const styles = StyleSheet.create({
     upsellText: {
         flex: 1,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     upsellButton: {
@@ -625,7 +601,7 @@ const styles = StyleSheet.create({
     },
     upsellButtonText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
 });

@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import YoombaaLogo from '../../assets/yoombaa logo svg.svg';
+import { FONTS } from '../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: 'rgba(255,255,255,0.85)',
         marginTop: 10,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     bottomCard: {
         backgroundColor: '#FFFFFF',
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#1F2937',
         textAlign: 'center',
     },
@@ -148,7 +149,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 6,
         marginBottom: 28,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     buttonsContainer: {
         gap: 12,
@@ -165,7 +166,7 @@ const styles = StyleSheet.create({
     primaryButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     secondaryButton: {
         backgroundColor: '#FFF5E6',
@@ -179,7 +180,7 @@ const styles = StyleSheet.create({
     secondaryButtonText: {
         color: '#FE9200',
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     loginLink: {
         alignItems: 'center',
@@ -189,11 +190,11 @@ const styles = StyleSheet.create({
     loginText: {
         fontSize: 14,
         color: '#6B7280',
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     loginTextBold: {
         color: '#FE9200',
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
 });
 

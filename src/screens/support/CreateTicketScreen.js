@@ -16,19 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { createTicket, TICKET_CATEGORIES, TICKET_PRIORITIES } from '../../lib/ticketService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const CreateTicketScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -40,6 +28,24 @@ const CreateTicketScreen = ({ navigation }) => {
     const [category, setCategory] = useState('general');
     const [priority, setPriority] = useState('medium');
     const [submitting, setSubmitting] = useState(false);
+
+    const hasUnsavedChanges = subject.trim().length > 0 || description.trim().length > 0;
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!hasUnsavedChanges) return;
+            e.preventDefault();
+            Alert.alert(
+                'Discard changes?',
+                'You have unsaved changes. Are you sure you want to leave?',
+                [
+                    { text: 'Stay', style: 'cancel' },
+                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+                ]
+            );
+        });
+        return unsubscribe;
+    }, [navigation, hasUnsavedChanges]);
 
     const isValid = subject.trim().length >= 3 && description.trim().length >= 10;
 
@@ -217,7 +223,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     scrollView: { flex: 1 },
@@ -225,7 +231,7 @@ const styles = StyleSheet.create({
     fieldGroup: { marginBottom: 24 },
     label: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 10,
     },
@@ -237,7 +243,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     textArea: {
@@ -246,7 +252,7 @@ const styles = StyleSheet.create({
     },
     charCount: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
         textAlign: 'right',
         marginTop: 6,
@@ -273,7 +279,7 @@ const styles = StyleSheet.create({
     },
     optionChipText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     optionChipTextActive: {
@@ -301,7 +307,7 @@ const styles = StyleSheet.create({
     },
     priorityText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     submitBtn: {
@@ -319,7 +325,7 @@ const styles = StyleSheet.create({
     },
     submitBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
 });

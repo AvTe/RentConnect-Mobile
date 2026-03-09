@@ -19,22 +19,9 @@ import {
     createProperty,
     updateProperty,
     PROPERTY_TYPES,
-    LISTING_TYPES,
     AMENITIES,
 } from '../../lib/propertyService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    error: '#EF4444',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const CreatePropertyScreen = ({ navigation, route }) => {
     const editProperty = route.params?.editProperty;
@@ -46,28 +33,40 @@ const CreatePropertyScreen = ({ navigation, route }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [propertyType, setPropertyType] = useState('apartment');
-    const [listingType, setListingType] = useState('rent');
     const [price, setPrice] = useState('');
     const [bedrooms, setBedrooms] = useState('');
     const [bathrooms, setBathrooms] = useState('');
-    const [area, setArea] = useState('');
-    const [address, setAddress] = useState('');
-    const [city, setCity] = useState('');
+    const [location, setLocation] = useState('');
     const [selectedAmenities, setSelectedAmenities] = useState([]);
     const [submitting, setSubmitting] = useState(false);
+
+    const hasUnsavedChanges = title.trim().length > 0 || description.trim().length > 0 || price.trim().length > 0 || location.trim().length > 0;
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!hasUnsavedChanges) return;
+            e.preventDefault();
+            Alert.alert(
+                'Discard changes?',
+                'You have unsaved changes. Are you sure you want to leave?',
+                [
+                    { text: 'Stay', style: 'cancel' },
+                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+                ]
+            );
+        });
+        return unsubscribe;
+    }, [navigation, hasUnsavedChanges]);
 
     useEffect(() => {
         if (editProperty) {
             setTitle(editProperty.title || '');
             setDescription(editProperty.description || '');
             setPropertyType(editProperty.property_type || 'apartment');
-            setListingType(editProperty.listing_type || 'rent');
             setPrice(editProperty.price?.toString() || '');
             setBedrooms(editProperty.bedrooms?.toString() || '');
             setBathrooms(editProperty.bathrooms?.toString() || '');
-            setArea(editProperty.area?.toString() || '');
-            setAddress(editProperty.address || '');
-            setCity(editProperty.city || '');
+            setLocation(editProperty.location || '');
             setSelectedAmenities(editProperty.amenities || []);
         }
     }, [editProperty]);
@@ -78,7 +77,7 @@ const CreatePropertyScreen = ({ navigation, route }) => {
         );
     };
 
-    const isValid = title.trim().length >= 3 && price && city.trim().length >= 2;
+    const isValid = title.trim().length >= 3 && price && location.trim().length >= 2;
 
     const handleSubmit = async () => {
         if (!isValid || submitting) return;
@@ -90,13 +89,10 @@ const CreatePropertyScreen = ({ navigation, route }) => {
                 title: title.trim(),
                 description: description.trim(),
                 propertyType,
-                listingType,
                 price: parseFloat(price),
                 bedrooms: bedrooms ? parseInt(bedrooms) : null,
                 bathrooms: bathrooms ? parseInt(bathrooms) : null,
-                area: area ? parseFloat(area) : null,
-                address: address.trim(),
-                city: city.trim(),
+                location: location.trim(),
                 amenities: selectedAmenities,
             };
 
@@ -106,13 +102,10 @@ const CreatePropertyScreen = ({ navigation, route }) => {
                     title: propertyData.title,
                     description: propertyData.description,
                     property_type: propertyData.propertyType,
-                    listing_type: propertyData.listingType,
                     price: propertyData.price,
                     bedrooms: propertyData.bedrooms,
                     bathrooms: propertyData.bathrooms,
-                    area: propertyData.area,
-                    address: propertyData.address,
-                    city: propertyData.city,
+                    location: propertyData.location,
                     amenities: propertyData.amenities,
                 });
             } else {
@@ -190,24 +183,6 @@ const CreatePropertyScreen = ({ navigation, route }) => {
                     </View>
                 </View>
 
-                {/* Listing Type */}
-                <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Listing Type</Text>
-                    <View style={styles.toggleRow}>
-                        {LISTING_TYPES.map((lt) => (
-                            <TouchableOpacity
-                                key={lt.id}
-                                style={[styles.toggleBtn, listingType === lt.id && styles.toggleBtnActive]}
-                                onPress={() => setListingType(lt.id)}
-                            >
-                                <Text style={[styles.toggleText, listingType === lt.id && styles.toggleTextActive]}>
-                                    {lt.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
                 {/* Price */}
                 <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Price (KES) *</Text>
@@ -248,39 +223,15 @@ const CreatePropertyScreen = ({ navigation, route }) => {
                     </View>
                 </View>
 
-                {/* Area */}
-                <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Area (sqft)</Text>
-                    <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g., 750"
-                        placeholderTextColor={COLORS.textLight}
-                        value={area}
-                        onChangeText={setArea}
-                        keyboardType="numeric"
-                    />
-                </View>
-
                 {/* Location */}
                 <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>City *</Text>
+                    <Text style={styles.label}>Location *</Text>
                     <TextInput
                         style={styles.textInput}
-                        placeholder="e.g., Nairobi"
+                        placeholder="e.g., Kilimani, Nairobi"
                         placeholderTextColor={COLORS.textLight}
-                        value={city}
-                        onChangeText={setCity}
-                    />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                    <Text style={styles.label}>Address</Text>
-                    <TextInput
-                        style={styles.textInput}
-                        placeholder="Street address or area"
-                        placeholderTextColor={COLORS.textLight}
-                        value={address}
-                        onChangeText={setAddress}
+                        value={location}
+                        onChangeText={setLocation}
                     />
                 </View>
 
@@ -368,7 +319,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     scrollView: { flex: 1 },
@@ -376,7 +327,7 @@ const styles = StyleSheet.create({
     fieldGroup: { marginBottom: 20 },
     label: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 8,
     },
@@ -388,7 +339,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     textArea: {
@@ -420,7 +371,7 @@ const styles = StyleSheet.create({
     },
     chipText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     chipTextActive: {
@@ -445,7 +396,7 @@ const styles = StyleSheet.create({
     },
     toggleText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     toggleTextActive: {
@@ -466,7 +417,7 @@ const styles = StyleSheet.create({
     },
     submitBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
 });

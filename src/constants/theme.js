@@ -16,10 +16,21 @@ export const COLORS = {
     textLight: '#9CA3AF',
     border: '#E5E7EB',
     success: '#10B981',
+    successLight: '#D1FAE5',
     warning: '#F59E0B',
+    warningLight: '#FEF3C7',
     error: '#EF4444',
+    errorLight: '#FEE2E2',
     purple: '#8B5CF6',
+    purpleLight: '#EDE9FE',
     amber: '#D97706',
+    blue: '#3B82F6',
+    blueLight: '#DBEAFE',
+    starFilled: '#F59E0B',
+    starEmpty: '#E5E7EB',
+    dark: '#1E293B',
+    darkHeader: '#0F172A',
+    expired: '#9CA3AF',
 };
 
 export const FONT_SIZES = {

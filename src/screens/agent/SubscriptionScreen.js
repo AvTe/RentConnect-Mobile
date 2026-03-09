@@ -21,22 +21,7 @@ import {
     getActiveSubscription,
     checkSubscriptionStatus,
 } from '../../lib/subscriptionService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryDark: '#E58300',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    purple: '#8B5CF6',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const SubscriptionScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -76,6 +61,14 @@ const SubscriptionScreen = ({ navigation }) => {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadData();
+        });
+        return unsubscribe;
+    }, [navigation, loadData]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -323,7 +316,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     tabRow: {
@@ -348,12 +341,12 @@ const styles = StyleSheet.create({
     },
     tabText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     tabTextActive: {
         color: COLORS.primary,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     scrollView: { flex: 1 },
     scrollContent: { padding: 16 },
@@ -377,12 +370,12 @@ const styles = StyleSheet.create({
     },
     currentPlanLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.8)',
     },
     currentPlanName: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         marginTop: 2,
     },
@@ -397,7 +390,7 @@ const styles = StyleSheet.create({
     },
     activeBadgeText: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: '#FFFFFF',
     },
     daysRow: {
@@ -408,7 +401,7 @@ const styles = StyleSheet.create({
     },
     daysText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.9)',
     },
     expiringBanner: {
@@ -422,7 +415,7 @@ const styles = StyleSheet.create({
     },
     expiringText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: '#FFFFFF',
     },
     planCard: {
@@ -449,23 +442,23 @@ const styles = StyleSheet.create({
     },
     popularText: {
         fontSize: 11,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     planName: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 4,
     },
     planPrice: {
         fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     planDuration: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginBottom: 16,
     },
@@ -477,7 +470,7 @@ const styles = StyleSheet.create({
     },
     featureText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     selectBtn: {
@@ -491,7 +484,7 @@ const styles = StyleSheet.create({
     },
     selectBtnText: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.primary,
     },
     selectBtnTextPopular: {
@@ -519,23 +512,23 @@ const styles = StyleSheet.create({
     bundleInfo: { flex: 1 },
     bundleName: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     bundleCredits: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     bundlePriceWrap: { alignItems: 'flex-end' },
     bundlePrice: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     bundleBonus: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.success,
         marginTop: 2,
     },
@@ -546,7 +539,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 15,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
 });

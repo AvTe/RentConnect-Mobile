@@ -18,6 +18,7 @@ import { logger } from '../lib/logger';
 import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import { FONTS } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -303,13 +304,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: 'DMSans_700Bold',
+    fontFamily: FONTS.bold,
     color: '#1F2937',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: FONTS.regular,
     color: '#6B7280',
   },
   form: {
@@ -320,7 +321,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: FONTS.medium,
     color: '#374151',
     marginBottom: 8,
   },
@@ -340,7 +341,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 16,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: FONTS.regular,
     color: '#1F2937',
   },
   eyeButton: {
@@ -352,7 +353,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: FONTS.medium,
     color: '#FE9200',
   },
   loginButton: {
@@ -364,7 +365,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     fontSize: 16,
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: FONTS.semiBold,
     color: '#FFFFFF',
   },
   divider: {
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     fontSize: 14,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: FONTS.regular,
     color: '#9CA3AF',
   },
   googleButton: {
@@ -401,7 +402,7 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontSize: 16,
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: FONTS.medium,
     color: '#1F2937',
   },
   googleButtonTextDisabled: {
@@ -409,7 +410,7 @@ const styles = StyleSheet.create({
   },
   devBadge: {
     fontSize: 10,
-    fontFamily: 'DMSans_500Medium',
+    fontFamily: FONTS.medium,
     color: '#FFFFFF',
     backgroundColor: '#FE9200',
     paddingHorizontal: 6,
@@ -423,12 +424,12 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: FONTS.regular,
     color: '#6B7280',
   },
   signUpLink: {
     fontSize: 14,
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: FONTS.semiBold,
     color: '#FE9200',
   },
 });

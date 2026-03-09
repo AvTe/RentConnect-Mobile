@@ -8,28 +8,14 @@ import {
     TextInput,
     ActivityIndicator,
     RefreshControl,
+    Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { reportBadLead, getAgentBadLeadReports, BAD_LEAD_REASONS } from '../../lib/agentService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryDark: '#E58300',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    error: '#EF4444',
-    errorLight: '#FEE2E2',
-    warning: '#F59E0B',
-    warningLight: '#FEF3C7',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const BadLeadReportScreen = ({ navigation, route }) => {
     const { leadId, leadTitle } = route.params || {};
@@ -45,9 +31,36 @@ const BadLeadReportScreen = ({ navigation, route }) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    // Unsaved changes detection
+    const hasUnsavedChanges = selectedReason !== null || description.trim().length > 0;
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!hasUnsavedChanges) return;
+            e.preventDefault();
+            Alert.alert(
+                'Discard changes?',
+                'You have unsaved changes. Are you sure you want to leave?',
+                [
+                    { text: 'Stay', style: 'cancel' },
+                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+                ]
+            );
+        });
+        return unsubscribe;
+    }, [navigation, hasUnsavedChanges]);
+
     useEffect(() => {
         loadReports();
     }, []);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadReports();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const loadReports = async () => {
         try {
@@ -300,7 +313,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     tabs: {
@@ -325,12 +338,12 @@ const styles = StyleSheet.create({
     },
     tabText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     tabTextActive: {
         color: COLORS.primary,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     scrollView: { flex: 1 },
     scrollContent: { padding: 16 },
@@ -349,18 +362,18 @@ const styles = StyleSheet.create({
     },
     leadInfoLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.error,
     },
     leadInfoTitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginTop: 2,
     },
     fieldLabel: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 10,
     },
@@ -384,12 +397,12 @@ const styles = StyleSheet.create({
     },
     reasonText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     reasonTextActive: {
         color: COLORS.primary,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     textAreaWrapper: {
         backgroundColor: COLORS.card,
@@ -402,12 +415,12 @@ const styles = StyleSheet.create({
         height: 140,
         padding: 14,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     charCount: {
         fontSize: 11,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
         textAlign: 'right',
         paddingRight: 14,
@@ -427,7 +440,7 @@ const styles = StyleSheet.create({
     },
     submitBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     emptyState: {
@@ -437,12 +450,12 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     emptySubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     reportCard: {
@@ -468,12 +481,12 @@ const styles = StyleSheet.create({
     },
     reportReason: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     reportDate: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
         marginTop: 1,
     },
@@ -484,11 +497,11 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     reportDescription: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 10,
         lineHeight: 20,
@@ -504,7 +517,7 @@ const styles = StyleSheet.create({
     },
     reportLeadText: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
     },
 });

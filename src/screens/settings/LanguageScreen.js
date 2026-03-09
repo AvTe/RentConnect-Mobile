@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage, availableLanguages } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
+import { FONTS } from '../../constants/theme';
 
 const LanguageScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     placeholder: {
         width: 32,
@@ -280,7 +281,7 @@ const styles = StyleSheet.create({
     searchText: {
         flex: 1,
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     loadingOverlay: {
         padding: 12,
@@ -305,7 +306,7 @@ const styles = StyleSheet.create({
     },
     currentLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         letterSpacing: 0.5,
     },
     currentInfo: {
@@ -318,18 +319,18 @@ const styles = StyleSheet.create({
     },
     currentName: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     currentNative: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     section: {
         marginBottom: 24,
     },
     sectionTitle: {
         fontSize: 12,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         letterSpacing: 0.5,
         marginBottom: 12,
     },
@@ -351,11 +352,11 @@ const styles = StyleSheet.create({
     },
     languageName: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     languageNative: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         marginTop: 2,
     },
     radioOuter: {
@@ -379,7 +380,7 @@ const styles = StyleSheet.create({
     emptyText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     infoNote: {
         flexDirection: 'row',
@@ -392,7 +393,7 @@ const styles = StyleSheet.create({
     infoText: {
         flex: 1,
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         lineHeight: 20,
     },
 });

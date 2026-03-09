@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useTheme } from '../../context/ThemeContext';
+import { FONTS } from '../../constants/theme';
 
 const PRIVACY_URL = 'https://www.yoombaa.com/privacy-policy';
 
@@ -94,7 +95,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     headerPlaceholder: {
         width: 40,
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
     },
     errorContainer: {
         ...StyleSheet.absoluteFillObject,
@@ -129,12 +130,12 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         marginTop: 16,
     },
     errorDesc: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         textAlign: 'center',
         marginTop: 8,
         lineHeight: 20,
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
     retryText: {
         color: '#FFFFFF',
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
 });
 

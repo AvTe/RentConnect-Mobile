@@ -22,23 +22,7 @@ import { getUnreadNotificationCount, subscribeToNotifications } from '../../lib/
 import YoombaaLogo from '../../../assets/yoombaa logo svg.svg';
 
 const { width } = Dimensions.get('window');
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    primaryDark: '#E58300',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    purple: '#8B5CF6',
-    amber: '#D97706',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const STATUS_COLORS = {
     active: { bg: '#D1FAE5', text: '#059669', border: '#A7F3D0' },
@@ -118,6 +102,14 @@ const TenantDashboardScreen = ({ navigation }) => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchData();
+        });
+        return unsubscribe;
+    }, [navigation, fetchData]);
 
     // Notification count + real-time subscription
     useEffect(() => {
@@ -328,7 +320,7 @@ const TenantDashboardScreen = ({ navigation }) => {
                         <Text style={styles.statLabel}>VIEWS</Text>
                         <View style={styles.statMeta}>
                             <Feather name="trending-up" size={10} color={COLORS.purple} />
-                            <Text style={[styles.statMetaText, { color: COLORS.purple }]}>+12 THIS WEEK</Text>
+                            <Text style={[styles.statMetaText, { color: COLORS.purple }]}>TOTAL</Text>
                         </View>
                     </Animated.View>
 
@@ -337,7 +329,7 @@ const TenantDashboardScreen = ({ navigation }) => {
                         <Text style={styles.statLabel}>REPLIES</Text>
                         <View style={styles.statMeta}>
                             <Feather name="clock" size={10} color={COLORS.amber} />
-                            <Text style={[styles.statMetaText, { color: COLORS.amber }]}>3 PENDING</Text>
+                            <Text style={[styles.statMetaText, { color: COLORS.amber }]}>TOTAL</Text>
                         </View>
                     </Animated.View>
                 </Animated.View>
@@ -504,7 +496,7 @@ const styles = StyleSheet.create({
     },
     notificationBadgeText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         lineHeight: 12,
     },
@@ -560,12 +552,12 @@ const styles = StyleSheet.create({
     promoTagText: {
         color: '#FFFFFF',
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 0.5,
     },
     bannerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         marginBottom: 4,
     },
@@ -617,14 +609,14 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         lineHeight: 32,
     },
     statLabel: {
         fontSize: 10,
         color: COLORS.textSecondary,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         letterSpacing: 0.5,
         marginTop: 2,
         marginBottom: 6,
@@ -637,7 +629,7 @@ const styles = StyleSheet.create({
     statMetaText: {
         fontSize: 9,
         color: COLORS.primary,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     // Browse Agents CTA
     browseAgentsCta: {
@@ -661,12 +653,12 @@ const styles = StyleSheet.create({
     },
     browseAgentsTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     browseAgentsSubtitle: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -679,7 +671,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     viewAllButton: {
@@ -690,7 +682,7 @@ const styles = StyleSheet.create({
     viewAllText: {
         fontSize: 13,
         color: COLORS.primary,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     // Empty State
     emptyCard: {
@@ -713,7 +705,7 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     emptySubtext: {
@@ -745,7 +737,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 0.5,
     },
     postedDateWrapper: {
@@ -769,7 +761,7 @@ const styles = StyleSheet.create({
     },
     requestTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
@@ -788,18 +780,18 @@ const styles = StyleSheet.create({
     budgetLabel: {
         fontSize: 9,
         color: COLORS.textLight,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         letterSpacing: 0.5,
     },
     budgetCurrency: {
         fontSize: 12,
         color: COLORS.primary,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
     },
     budgetAmount: {
         fontSize: 20,
         color: COLORS.primary,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
     },
     budgetPeriod: {
         fontSize: 11,
@@ -825,12 +817,12 @@ const styles = StyleSheet.create({
     metricLabel: {
         fontSize: 9,
         color: COLORS.textLight,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         letterSpacing: 0.3,
     },
     metricValue: {
         fontSize: 14,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     metricDivider: {
@@ -846,7 +838,7 @@ const styles = StyleSheet.create({
     },
     manageBtnText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
 });

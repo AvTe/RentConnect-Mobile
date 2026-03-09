@@ -19,24 +19,9 @@ import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
 import { addAgentCredits } from '../../lib/leadService';
 import { processReferralOnFirstPurchase } from '../../lib/database';
+import { COLORS, FONTS } from '../../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    dark: '#1E293B',
-    darkHeader: '#0F172A',
-};
 
 const BuyCreditsScreen = ({ navigation, route }) => {
     const insets = useSafeAreaInsets();
@@ -96,6 +81,14 @@ const BuyCreditsScreen = ({ navigation, route }) => {
         fetchBundles();
     }, [fetchBundles]);
 
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchBundles();
+        });
+        return unsubscribe;
+    }, [navigation, fetchBundles]);
+
     const formatPrice = (price) => {
         return `KSh ${price?.toLocaleString() || 0}`;
     };
@@ -129,16 +122,15 @@ const BuyCreditsScreen = ({ navigation, route }) => {
                 return;
             }
 
-            // Create payment record (only use columns that exist in the table)
+            // Create payment record
             const { data: payment, error: paymentError } = await supabase
                 .from('payment_transactions')
                 .insert({
                     user_id: user.id,
                     amount: selectedBundle.price,
                     currency: 'KES',
-                    payment_method: 'mpesa',
+                    gateway: 'mpesa',
                     status: 'pending',
-                    description: `${selectedBundle.credits} Lead Credits - ${selectedBundle.name}`,
                     created_at: new Date().toISOString(),
                 })
                 .select()
@@ -146,78 +138,92 @@ const BuyCreditsScreen = ({ navigation, route }) => {
 
             if (paymentError) {
                 console.error('Payment record error:', paymentError);
+                toast.error('Failed to initiate payment. Please try again.');
+                setProcessing(false);
+                return;
             }
 
-            // Send M-Pesa STK Push request
+            // TODO: Trigger actual M-Pesa STK Push via server-side Edge Function.
+            // The Edge Function should call the Safaricom Daraja API to send
+            // an STK push to the user's phone, then the M-Pesa callback
+            // should update payment_transactions.status to 'completed'.
+            logger.warn('[BuyCredits] M-Pesa STK Push not yet integrated. Payment will remain pending until server confirms.');
+
             toast.success('M-Pesa payment request sent! Check your phone.');
 
-            // TODO: Replace with actual M-Pesa API integration
-            // In production, credits should ONLY be added after server-side
-            // payment confirmation via M-Pesa callback webhook.
-            // The current implementation is a development placeholder.
-            logger.warn('[BuyCredits] Using dev placeholder — credits added without payment verification. Integrate M-Pesa callback before production release.');
+            // Poll for server-confirmed payment status
+            const MAX_POLLS = 20;
+            const POLL_INTERVAL = 3000; // 3 seconds
+            let polls = 0;
 
-            setTimeout(async () => {
+            const pollPaymentStatus = async () => {
+                polls++;
                 try {
-                    // Verify payment status before crediting
-                    // In production: poll server for payment confirmation
-                    // or wait for webhook to update payment_transactions status
-                    if (payment?.id) {
-                        const { data: paymentStatus } = await supabase
-                            .from('payment_transactions')
-                            .select('status')
-                            .eq('id', payment.id)
-                            .single();
+                    const { data: paymentStatus, error: pollError } = await supabase
+                        .from('payment_transactions')
+                        .select('status')
+                        .eq('id', payment.id)
+                        .single();
 
-                        // In production, only proceed if status === 'completed'
-                        // For dev, we allow 'pending' to pass through
-                        if (paymentStatus?.status === 'failed') {
-                            toast.error('Payment failed. Please try again.');
-                            setProcessing(false);
-                            return;
+                    if (pollError) {
+                        console.error('Payment status poll error:', pollError);
+                    }
+
+                    const status = paymentStatus?.status;
+
+                    if (status === 'completed') {
+                        // Payment confirmed by server — grant credits
+                        const creditResult = await addAgentCredits(
+                            user.id,
+                            selectedBundle.credits,
+                            {
+                                paymentMethod: 'M-Pesa',
+                                amount: selectedBundle.price,
+                                confirmationCode: payment.id,
+                                transactionId: payment.id,
+                            }
+                        );
+
+                        if (!creditResult.success) {
+                            toast.error('Payment confirmed but credit update failed. Contact support.');
+                        } else {
+                            // Process referral bonus on first purchase
+                            try {
+                                await processReferralOnFirstPurchase(user.id);
+                            } catch (refErr) {
+                                console.error('Non-critical referral processing error:', refErr);
+                            }
+                            toast.success(`${selectedBundle.credits} credits added to your wallet!`);
                         }
+                        setProcessing(false);
+                        setShowPaymentMethods(false);
+                        navigation.goBack();
+                        return;
                     }
 
-                    // Add credits to wallet using shared service (sends notification)
-                    const creditResult = await addAgentCredits(
-                        user.id,
-                        selectedBundle.credits,
-                        {
-                            paymentMethod: 'M-Pesa',
-                            amount: selectedBundle.price,
-                            confirmationCode: payment?.id || '',
-                            transactionId: payment?.id,
-                        }
-                    );
-
-                    if (!creditResult.success) {
-                        throw new Error(creditResult.error || 'Failed to add credits');
+                    if (status === 'failed') {
+                        toast.error('Payment failed. Please try again.');
+                        setProcessing(false);
+                        return;
                     }
 
-                    // Update payment status
-                    if (payment?.id) {
-                        await supabase
-                            .from('payment_transactions')
-                            .update({ status: 'completed' })
-                            .eq('id', payment.id);
+                    // Still pending — keep polling or timeout
+                    if (polls < MAX_POLLS) {
+                        setTimeout(pollPaymentStatus, POLL_INTERVAL);
+                    } else {
+                        toast.info('Payment is still processing. Credits will be added once payment is confirmed.');
+                        setProcessing(false);
+                        setShowPaymentMethods(false);
                     }
-
-                    // Process two-stage referral bonus on first purchase (matches web)
-                    try {
-                        await processReferralOnFirstPurchase(user.id);
-                    } catch (refErr) {
-                        console.error('Non-critical referral processing error:', refErr);
-                    }
-
-                    toast.success(`${selectedBundle.credits} credits added to your wallet!`);
-                    setShowPaymentMethods(false);
-                    navigation.goBack();
                 } catch (err) {
-                    console.error('Credit update error:', err);
-                    toast.error('Payment received but credit update failed. Contact support.');
+                    console.error('Payment poll error:', err);
+                    toast.error('Could not verify payment. Contact support if money was deducted.');
+                    setProcessing(false);
                 }
-                setProcessing(false);
-            }, 3000);
+            };
+
+            // Start polling after initial delay for STK push
+            setTimeout(pollPaymentStatus, POLL_INTERVAL);
 
         } catch (error) {
             console.error('Payment error:', error);
@@ -238,9 +244,8 @@ const BuyCreditsScreen = ({ navigation, route }) => {
                     user_id: user.id,
                     amount: selectedBundle.price,
                     currency: 'KES',
-                    payment_method: 'pesapal',
+                    gateway: 'pesapal',
                     status: 'pending',
-                    description: `${selectedBundle.credits} Lead Credits - ${selectedBundle.name}`,
                     created_at: new Date().toISOString(),
                 })
                 .select()
@@ -583,7 +588,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     // Dark Header
@@ -611,7 +616,7 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         letterSpacing: 0.5,
     },
@@ -626,13 +631,13 @@ const styles = StyleSheet.create({
     },
     heroTitle: {
         fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         marginBottom: 8,
     },
     heroSubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.7)',
         lineHeight: 20,
     },
@@ -654,12 +659,12 @@ const styles = StyleSheet.create({
     },
     secureTitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     secureDesc: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: 'rgba(255,255,255,0.6)',
     },
     // Main Content
@@ -674,13 +679,13 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 4,
     },
     sectionSubtitle: {
         fontSize: 11,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
         letterSpacing: 0.5,
     },
@@ -734,7 +739,7 @@ const styles = StyleSheet.create({
     },
     bundleName: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     bundleNameSelected: {
@@ -748,13 +753,13 @@ const styles = StyleSheet.create({
     },
     popularText: {
         fontSize: 9,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
         letterSpacing: 0.5,
     },
     bundleDescription: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     bundlePricing: {
@@ -762,7 +767,7 @@ const styles = StyleSheet.create({
     },
     bundlePrice: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     bundlePriceSelected: {
@@ -770,7 +775,7 @@ const styles = StyleSheet.create({
     },
     bundlePerLead: {
         fontSize: 10,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
     },
@@ -797,19 +802,19 @@ const styles = StyleSheet.create({
     },
     bonusLabel: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
         letterSpacing: 0.5,
         marginBottom: 2,
     },
     bonusText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
         lineHeight: 20,
     },
     bonusHighlight: {
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     agentsRow: {
@@ -827,7 +832,7 @@ const styles = StyleSheet.create({
     },
     agentText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     agentsInfo: {
@@ -838,7 +843,7 @@ const styles = StyleSheet.create({
     },
     agentsCount: {
         fontSize: 10,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
     },
@@ -859,7 +864,7 @@ const styles = StyleSheet.create({
     },
     sslText: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     purchaseButton: {
@@ -876,7 +881,7 @@ const styles = StyleSheet.create({
     },
     purchaseText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
     complianceRow: {
@@ -887,7 +892,7 @@ const styles = StyleSheet.create({
     },
     complianceText: {
         fontSize: 10,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
     },
@@ -902,7 +907,7 @@ const styles = StyleSheet.create({
     },
     backText: {
         fontSize: 16,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
     paymentScrollView: {
@@ -913,13 +918,13 @@ const styles = StyleSheet.create({
     },
     paymentTitle: {
         fontSize: 28,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 8,
     },
     paymentSubtitle: {
         fontSize: 16,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginBottom: 32,
     },
@@ -946,7 +951,7 @@ const styles = StyleSheet.create({
     },
     mpesaIconText: {
         fontSize: 10,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     pesapalIcon: {
@@ -973,7 +978,7 @@ const styles = StyleSheet.create({
     },
     paymentOptionName: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     instantBadge: {
@@ -984,12 +989,12 @@ const styles = StyleSheet.create({
     },
     instantText: {
         fontSize: 9,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: '#FFFFFF',
     },
     paymentOptionDesc: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     securityNote: {
@@ -1001,7 +1006,7 @@ const styles = StyleSheet.create({
     },
     securityText: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     processingOverlay: {
@@ -1011,7 +1016,7 @@ const styles = StyleSheet.create({
     processingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     securityFooter: {
@@ -1029,12 +1034,12 @@ const styles = StyleSheet.create({
     },
     badgeLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     badgeValue: {
         fontSize: 10,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     aesNote: {
@@ -1045,7 +1050,7 @@ const styles = StyleSheet.create({
     },
     aesText: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
     },

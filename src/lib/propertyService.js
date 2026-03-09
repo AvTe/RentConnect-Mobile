@@ -17,21 +17,12 @@ export const createProperty = async (propertyData) => {
                 title: propertyData.title,
                 description: propertyData.description,
                 property_type: propertyData.propertyType,
-                listing_type: propertyData.listingType || 'rent',
                 price: propertyData.price,
                 bedrooms: propertyData.bedrooms,
                 bathrooms: propertyData.bathrooms,
-                area: propertyData.area,
-                area_unit: propertyData.areaUnit || 'sqft',
-                address: propertyData.address,
-                city: propertyData.city,
-                state: propertyData.state,
-                country: propertyData.country || 'Kenya',
-                latitude: propertyData.latitude,
-                longitude: propertyData.longitude,
+                location: propertyData.location || propertyData.address,
                 amenities: propertyData.amenities || [],
                 images: propertyData.images || [],
-                is_available: true,
                 status: 'active'
             }])
             .select()
@@ -61,9 +52,6 @@ export const getAgentProperties = async (agentId, filters = {}) => {
         }
         if (filters.propertyType) {
             query = query.eq('property_type', filters.propertyType);
-        }
-        if (filters.listingType) {
-            query = query.eq('listing_type', filters.listingType);
         }
 
         const { data, error } = await query;
@@ -108,7 +96,6 @@ export const deleteProperty = async (propertyId) => {
             .from('properties')
             .update({
                 status: 'deleted',
-                is_available: false,
                 updated_at: new Date().toISOString()
             })
             .eq('id', propertyId);
@@ -133,17 +120,13 @@ export const searchProperties = async (filters = {}) => {
                 agent:users!properties_agent_id_fkey(id, name, avatar, phone)
             `)
             .eq('status', 'active')
-            .eq('is_available', true)
             .order('created_at', { ascending: false });
 
-        if (filters.city) {
-            query = query.ilike('city', `%${filters.city}%`);
+        if (filters.location) {
+            query = query.ilike('location', `%${filters.location}%`);
         }
         if (filters.propertyType) {
             query = query.eq('property_type', filters.propertyType);
-        }
-        if (filters.listingType) {
-            query = query.eq('listing_type', filters.listingType);
         }
         if (filters.minPrice) {
             query = query.gte('price', filters.minPrice);

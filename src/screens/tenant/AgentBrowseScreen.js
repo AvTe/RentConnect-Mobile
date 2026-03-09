@@ -17,19 +17,7 @@ import {
     getAllAgents,
     searchAgents,
 } from '../../lib/agentService';
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const AgentBrowseScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
@@ -64,6 +52,14 @@ const AgentBrowseScreen = ({ navigation }) => {
         loadAgents();
     }, []);
 
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadAgents();
+        });
+        return unsubscribe;
+    }, [navigation]);
+
     // Debounced search
     useEffect(() => {
         if (searchTimeout) clearTimeout(searchTimeout);
@@ -88,7 +84,7 @@ const AgentBrowseScreen = ({ navigation }) => {
         >
             <View style={styles.agentAvatar}>
                 {agent.avatar ? (
-                    <Image source={{ uri: agent.avatar }} style={styles.agentAvatarImg} />
+                    <Image source={{ uri: agent.avatar }} style={styles.agentAvatarImg} onError={() => {}} />
                 ) : (
                     <Feather name="user" size={22} color={COLORS.primary} />
                 )}
@@ -197,7 +193,7 @@ const styles = StyleSheet.create({
     backBtn: { padding: 4 },
     headerTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     searchWrap: {
@@ -219,7 +215,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.text,
     },
     scrollView: { flex: 1 },
@@ -232,12 +228,12 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     resultsCount: {
         fontSize: 13,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         marginBottom: 12,
     },
@@ -269,12 +265,12 @@ const styles = StyleSheet.create({
     agentInfo: { flex: 1 },
     agentName: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     agentCompany: {
         fontSize: 13,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.primary,
         marginTop: 2,
     },
@@ -286,7 +282,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textLight,
     },
     emptyContainer: {
@@ -304,13 +300,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 6,
     },
     emptySubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
 });

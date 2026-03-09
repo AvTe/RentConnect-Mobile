@@ -18,24 +18,7 @@ import { useToast } from '../../context/ToastContext';
 import { getTenantLeads, updateLeadStatus, deleteLead } from '../../lib/leadService';
 
 const { width } = Dimensions.get('window');
-
-const COLORS = {
-    primary: '#FE9200',
-    primaryLight: '#FFF5E6',
-    background: '#F8F9FB',
-    card: '#FFFFFF',
-    text: '#1F2937',
-    textSecondary: '#6B7280',
-    textLight: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    successLight: '#D1FAE5',
-    warning: '#F59E0B',
-    warningLight: '#FEF3C7',
-    error: '#EF4444',
-    errorLight: '#FEE2E2',
-    purple: '#8B5CF6',
-};
+import { COLORS, FONTS } from '../../constants/theme';
 
 const STATUS_COLORS = {
     active: { bg: '#D1FAE5', text: '#059669' },
@@ -77,6 +60,14 @@ const MyRequestsScreen = ({ navigation }) => {
     useEffect(() => {
         fetchRequests();
     }, [fetchRequests]);
+
+    // Refresh data when screen comes back into focus
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchRequests();
+        });
+        return unsubscribe;
+    }, [navigation, fetchRequests]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -452,7 +443,7 @@ const MyRequestsScreen = ({ navigation }) => {
                                         </View>
                                         <View style={styles.detailRowContent}>
                                             <Text style={styles.detailRowLabel}>Budget</Text>
-                                            <Text style={[styles.detailRowValue, { color: COLORS.primary, fontFamily: 'DMSans_700Bold' }]}>
+                                            <Text style={[styles.detailRowValue, { color: COLORS.primary, fontFamily: FONTS.bold }]}>
                                                 KSh {formatBudget(selectedRequest.budget)}
                                                 <Text style={styles.detailBudgetPeriod}> /month</Text>
                                             </Text>
@@ -551,12 +542,12 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 24,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     headerSubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -572,7 +563,7 @@ const styles = StyleSheet.create({
     newRequestText: {
         color: '#FFFFFF',
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     scrollView: {
         flex: 1,
@@ -595,13 +586,13 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 20,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 8,
     },
     emptyText: {
         fontSize: 15,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
@@ -619,7 +610,7 @@ const styles = StyleSheet.create({
     createButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     requestCard: {
         backgroundColor: COLORS.card,
@@ -641,12 +632,12 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 11,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         letterSpacing: 0.5,
     },
     postedDate: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginLeft: 12,
         flex: 1,
@@ -656,17 +647,17 @@ const styles = StyleSheet.create({
     },
     budgetAmount: {
         fontSize: 18,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.primary,
     },
     budgetPeriod: {
         fontSize: 10,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     requestTitle: {
         fontSize: 18,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
         marginBottom: 8,
     },
@@ -677,7 +668,7 @@ const styles = StyleSheet.create({
     },
     locationText: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginLeft: 6,
     },
@@ -700,13 +691,13 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: 10,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
     },
     statValue: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     manageBtn: {
@@ -716,7 +707,7 @@ const styles = StyleSheet.create({
     },
     manageText: {
         fontSize: 14,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.text,
     },
 
@@ -744,13 +735,13 @@ const styles = StyleSheet.create({
     },
     sheetTitle: {
         fontSize: 20,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
         marginBottom: 4,
     },
     sheetSubtitle: {
         fontSize: 14,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginBottom: 20,
     },
@@ -777,12 +768,12 @@ const styles = StyleSheet.create({
     },
     sheetActionTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     sheetActionDesc: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
         marginTop: 2,
     },
@@ -800,7 +791,7 @@ const styles = StyleSheet.create({
     },
     sheetCancelText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.textSecondary,
     },
 
@@ -841,7 +832,7 @@ const styles = StyleSheet.create({
     },
     detailTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     detailBody: {},
@@ -864,7 +855,7 @@ const styles = StyleSheet.create({
     },
     detailStatusText: {
         fontSize: 13,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
     },
     detailRows: {
         backgroundColor: COLORS.background,
@@ -891,7 +882,7 @@ const styles = StyleSheet.create({
     },
     detailRowLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
         letterSpacing: 0.3,
         textTransform: 'uppercase',
@@ -899,12 +890,12 @@ const styles = StyleSheet.create({
     },
     detailRowValue: {
         fontSize: 15,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: COLORS.text,
     },
     detailBudgetPeriod: {
         fontSize: 12,
-        fontFamily: 'DMSans_400Regular',
+        fontFamily: FONTS.regular,
         color: COLORS.textSecondary,
     },
     detailRowDivider: {
@@ -927,12 +918,12 @@ const styles = StyleSheet.create({
     },
     detailStatValue: {
         fontSize: 16,
-        fontFamily: 'DMSans_700Bold',
+        fontFamily: FONTS.bold,
         color: COLORS.text,
     },
     detailStatLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans_500Medium',
+        fontFamily: FONTS.medium,
         color: COLORS.textSecondary,
     },
     detailDoneBtn: {
@@ -943,7 +934,7 @@ const styles = StyleSheet.create({
     },
     detailDoneBtnText: {
         fontSize: 16,
-        fontFamily: 'DMSans_600SemiBold',
+        fontFamily: FONTS.semiBold,
         color: '#FFFFFF',
     },
 });
